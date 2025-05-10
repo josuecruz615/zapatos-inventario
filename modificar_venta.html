@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Modificar Venta - ZAPATONGT</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="js/supabase-client.js"></script>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <div id="header"></div>
+
+  <main class="contenido">
+    <h1>✏️ Modificar Venta</h1>
+
+    <label for="venta-select">Selecciona una venta:</label>
+    <select id="venta-select" onchange="cargarDetalleVenta()"></select>
+
+    <h2>Detalle Actual</h2>
+    <table id="detalle-venta">
+      <thead>
+        <tr>
+          <th>Producto</th>
+          <th>Talla</th>
+          <th>Cantidad</th>
+          <th>Precio</th>
+          <th>Subtotal</th>
+          <th>Acción</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <h2>Agregar Producto</h2>
+    <select id="producto-select"></select>
+    <div id="preview-imagen" style="margin: 10px 0;"></div>
+    <input type="number" id="cantidad-agregar" placeholder="Cantidad" min="1">
+    <button onclick="agregarProductoAVenta()">➕ Agregar</button>
+
+    <div style="margin-top: 20px;">
+      <button onclick="guardarCambios()">💾 Guardar Cambios</button>
+      <button onclick="eliminarVenta()" style="background-color: red;">🗑️ Eliminar Venta</button>
+    </div>
+  </main>
+
+  <div id="footer"></div>
+
+  <script>
+    let productos = [];
+    let ventaActual = null;
+    let detalleOriginal = [];
+    let idsAEliminar = [];
+
+    (async () => {
+      document.getElementById("header").innerHTML = await fetch('header.html').then(r => r.text());
+      document.getElementById("footer").innerHTML = await fetch('footer.html').then(r => r.text());
+      await cargarVentas();
+      await cargarProductos();
+    })();
+
+    async function cargarVentas() {
+      const select = document.getElementById('venta-select');
+      const { data, error } = await supabase
+        .from('VENTAS')
+        .select('id, created_at, CLIENTE(nombre)')
+        .order('created_at', { ascending: false });
+
+      if (error) return alert('Error al cargar ventas');
+
+      select.innerHTML = '<option value="">Selecciona una venta</option>';
+      data.forEach(v => {
+        const op = document.createElement('option');
+        op.value = v.id;
+        op.textContent = `${v.id} - ${v.CLIENTE?.nombre || 'Sin cliente'} - ${new Date(v.created_at).toLocaleDateString()}`;
+        select.appendChild(op);
+      });
+    }
+
+    async function cargarProductos() {
+      const { data, error } = await supabase
+        .from('INVENTARIO')
+        .select('*');
+
+      if (error) return alert('Error cargando inventario');
+      productos = data;
+
+      const select = document.getElementById('producto-select');
+      select.innerHTML = '';
+      productos.filter(p => p.disponible > 0).forEach(p => {
+        const op = document.createElement('option');
+        op.value = p.id;
+        op.textContent = `${p.nombre} - T${p.talla} (${p.disponible} disp) - Q${p.precio}`;
+        select.appendChild(op);
+      });
+
+      document.getElementById('producto-select').addEventListener('change', mostrarPreviewImagen);
+      mostrarPreviewImagen();
+    }
+
+    function mostrarPreviewImagen() {
+      const id = parseInt(document.getElementById('producto-select').value);
+      const producto = productos.find(p => p.id === id);
+      const div = document.getElementById('preview-imagen');
+      if (producto) {
+        div.innerHTML = `<img src="${producto.imagen_url}" style="width: 120px; height: 120px; object-fit: cover; border-radius: 6px;">`;
+      } else {
+        div.innerHTML = '';
+      }
+    }
+
+    async function cargarDetalleVenta() {
+      const ventaId = document.getElementById('venta-select').value;
+      if (!ventaId) return;
+
+      ventaActual = parseInt(ventaId);
+      const { data, error } = await supabase
+        .from('DETALLE_VENTAS')
+        .select('id, producto_id, cantidad, precio_unitario, subtotal, INVENTARIO(nombre, talla, imagen_url)')
+        .eq('venta_id', ventaId);
+
+      if (error) return alert('Error al cargar detalle');
+
+      detalleOriginal = data;
+      const tbody = document.querySelector('#detalle-venta tbody');
+      tbody.innerHTML = '';
+
+      data.forEach((d, index) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>
+            <img src="${d.INVENTARIO.imagen_url}" style="width:40px;height:40px;object-fit:cover;border-radius:6px;margin-right:6px;vertical-align:middle;">
+            ${d.INVENTARIO.nombre}
+          </td>
+          <td>${d.INVENTARIO.talla}</td>
+          <td><input type="number" value="${d.cantidad}" min="1" data-index="${index}"></td>
+          <td>Q${d.precio_unitario.toFixed(2)}</td>
+          <td>Q${d.subtotal.toFixed(2)}</td>
+          <td><button onclick="quitarProducto(${index})">Quitar</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function quitarProducto(index) {
+      const item = detalleOriginal[index];
+      idsAEliminar.push(item.id);
+      const fila = document.querySelector('#detalle-venta tbody').children[index];
+      if (fila) fila.style.opacity = '0.5';
+      const input = fila.querySelector('input');
+      if (input) input.disabled = true;
+    }
+
+    async function agregarProductoAVenta() {
+      const id = parseInt(document.getElementById('producto-select').value);
+      const cantidad = parseInt(document.getElementById('cantidad-agregar').value);
+      if (!id || !cantidad || cantidad < 1) return alert('Datos inválidos');
+
+      const producto = productos.find(p => p.id === id);
+      if (!producto || producto.disponible < cantidad)
+        return alert('Cantidad no disponible en inventario');
+
+      const { error } = await supabase.from('DETALLE_VENTAS').insert([{
+        venta_id: ventaActual,
+        producto_id: id,
+        cantidad,
+        precio_unitario: producto.precio,
+        descuento: 0,
+        subtotal: producto.precio * cantidad
+      }]);
+
+      if (error) return alert('Error al agregar producto');
+
+      await supabase.from('INVENTARIO').update({
+        disponible: producto.disponible - cantidad
+      }).eq('id', id);
+
+      alert('Producto agregado');
+      await cargarProductos();
+      await cargarDetalleVenta();
+    }
+
+    async function guardarCambios() {
+      let total = 0;
+
+      for (const id of idsAEliminar) {
+        const item = detalleOriginal.find(i => i.id === id);
+        if (item) {
+          await supabase.from('DETALLE_VENTAS').delete().eq('id', id);
+          await actualizarInventario(item.producto_id, item.cantidad);
+        }
+      }
+
+      for (let i = 0; i < detalleOriginal.length; i++) {
+        const item = detalleOriginal[i];
+        if (idsAEliminar.includes(item.id)) continue;
+
+        const input = document.querySelector(`input[data-index="${i}"]`);
+        if (!input) continue;
+
+        const nuevaCantidad = parseInt(input.value);
+        if (isNaN(nuevaCantidad) || nuevaCantidad < 1) {
+          alert('Cantidad inválida en uno de los productos');
+          return;
+        }
+
+        const diferencia = nuevaCantidad - item.cantidad;
+        if (diferencia !== 0) {
+          const producto = productos.find(p => p.id === item.producto_id);
+          if (!producto || producto.disponible < diferencia) {
+            return alert(`No hay suficiente stock para ${item.INVENTARIO.nombre}`);
+          }
+
+          await supabase.from('DETALLE_VENTAS').update({
+            cantidad: nuevaCantidad,
+            subtotal: nuevaCantidad * item.precio_unitario
+          }).eq('id', item.id);
+
+          await actualizarInventario(item.producto_id, -diferencia);
+        }
+
+        total += nuevaCantidad * item.precio_unitario;
+      }
+
+      await supabase.from('VENTAS').update({ total }).eq('id', ventaActual);
+      alert('Cambios guardados correctamente');
+
+      idsAEliminar = [];
+      await cargarProductos();
+      await cargarDetalleVenta();
+    }
+
+    async function actualizarInventario(productoId, ajuste) {
+      const producto = productos.find(p => p.id === productoId);
+      if (!producto) return;
+
+      await supabase.from('INVENTARIO').update({
+        disponible: producto.disponible + ajuste
+      }).eq('id', productoId);
+
+      producto.disponible += ajuste;
+    }
+
+    async function eliminarVenta() {
+  if (!ventaActual) return alert('Selecciona una venta primero.');
+  if (!confirm('¿Estás seguro que deseas eliminar esta venta?')) return;
+
+  try {
+    // 1. Obtener el detalle
+    const { data: detalle, error: errorDetalle } = await supabase
+      .from('DETALLE_VENTAS')
+      .select('producto_id, cantidad')
+      .eq('venta_id', ventaActual);
+
+    if (errorDetalle) throw errorDetalle;
+
+    // 2. Devolver inventario
+    for (const item of detalle) {
+      const { data: inv, error: errorInv } = await supabase
+        .from('INVENTARIO')
+        .select('disponible')
+        .eq('id', item.producto_id)
+        .single();
+
+      if (errorInv) throw errorInv;
+
+      await supabase
+        .from('INVENTARIO')
+        .update({ disponible: inv.disponible + item.cantidad })
+        .eq('id', item.producto_id);
+    }
+
+    // 3. Eliminar los detalles
+    const { error: errorDetalles } = await supabase
+      .from('DETALLE_VENTAS')
+      .delete()
+      .eq('venta_id', ventaActual);
+
+    if (errorDetalles) throw errorDetalles;
+
+    // 4. Verifica que ya no haya detalles
+    const { count: detallesRestantes } = await supabase
+      .from('DETALLE_VENTAS')
+      .select('id', { count: 'exact', head: true })
+      .eq('venta_id', ventaActual);
+
+    if (detallesRestantes > 0) {
+      throw new Error('No se eliminaron todos los detalles, no se puede eliminar la venta.');
+    }
+
+    // 5. Eliminar la venta
+    const { error: errorVenta } = await supabase
+      .from('VENTAS')
+      .delete()
+      .eq('id', ventaActual);
+
+    if (errorVenta) throw errorVenta;
+
+    alert('✅ Venta eliminada correctamente');
+    window.location.reload();
+
+  } catch (err) {
+    console.error('❌ Error real al eliminar venta:', err);
+    alert('❌ No se pudo eliminar la venta. Revisa la consola.');
+  }
+}
+
+    
+  </script>
+</body>
+</html>

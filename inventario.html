@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Inventario - ZAPATONGT</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="js/supabase-client.js"></script>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <div id="header"></div>
+
+  <!-- Filtros de búsqueda -->
+  <div id="filtros-container">
+    <input list="codigos" type="text" id="filtroCodigo" placeholder="🔍 Código">
+    <datalist id="codigos"></datalist>
+
+    <input list="nombres" type="text" id="filtroNombre" placeholder="👟 Nombre">
+    <datalist id="nombres"></datalist>
+
+    <input list="marcas" type="text" id="filtroMarca" placeholder="🏷️ Marca">
+    <datalist id="marcas"></datalist>
+
+    <input list="tallas" type="text" id="filtroTalla" placeholder="📏 Talla">
+    <datalist id="tallas"></datalist>
+
+    <select id="filtroDisponible">
+      <option value="disponibles" selected>✔️ DISPONIBLES</option>
+      <option value="todos">📦 TODOS</option>
+    </select>
+
+    <button onclick="cargarInventario()">Buscar</button>
+    <button onclick="limpiarFiltros()">Limpiar</button>
+  </div>
+
+  <p id="contador-resultados"></p>
+
+  <div id="inventario-contenedor" class="grid-contenedor"></div>
+
+  <div id="footer"></div>
+
+  <script>
+    (async () => {
+      document.getElementById("header").innerHTML = await fetch('header.html').then(r => r.text());
+      document.getElementById("footer").innerHTML = await fetch('footer.html').then(r => r.text());
+    })();
+
+    async function cargarInventario() {
+      const { data, error } = await supabase
+        .from('INVENTARIO')
+        .select('id, codigo, nombre, marca, talla, disponible, precio, imagen_url');
+
+      if (error) return alert('Error al cargar inventario');
+
+      llenarDatalists(data);
+
+      const codigo = document.getElementById('filtroCodigo').value.trim().toLowerCase();
+      const nombre = document.getElementById('filtroNombre').value.trim().toLowerCase();
+      const marca = document.getElementById('filtroMarca').value.trim().toLowerCase();
+      const talla = document.getElementById('filtroTalla').value.trim();
+      const disponibleFiltro = document.getElementById('filtroDisponible').value;
+
+      let resultados = data;
+      if (codigo) resultados = resultados.filter(p => p.codigo.toLowerCase().includes(codigo));
+      if (nombre) resultados = resultados.filter(p => p.nombre.toLowerCase().includes(nombre));
+      if (marca) resultados = resultados.filter(p => p.marca.toLowerCase().includes(marca));
+      if (talla) resultados = resultados.filter(p => p.talla == talla);
+      if (disponibleFiltro === 'disponibles') {
+        resultados = resultados.filter(p => p.disponible > 0);
+      }
+
+      const agrupado = {};
+      resultados.forEach(item => {
+        if (!agrupado[item.codigo]) agrupado[item.codigo] = [];
+        agrupado[item.codigo].push(item);
+      });
+
+      const contenedor = document.getElementById('inventario-contenedor');
+      contenedor.innerHTML = '';
+
+      if (resultados.length === 0) {
+        contenedor.innerHTML = '<p>No se encontraron productos con esos filtros.</p>';
+        document.getElementById("contador-resultados").textContent = '';
+        return;
+      }
+
+      document.getElementById("contador-resultados").textContent =
+        `Mostrando ${Object.keys(agrupado).length} productos distintos.`;
+
+      for (const [codigo, items] of Object.entries(agrupado)) {
+        const producto = items[0];
+        const div = document.createElement('div');
+        div.className = 'card';
+
+        items.sort((a, b) => parseFloat(a.talla) - parseFloat(b.talla));
+
+
+        const filas = items.map(i => {
+          const etiqueta = i.disponible > 5
+            ? '<span class="disponible-label verde">✔️</span>'
+            : i.disponible > 0
+            ? '<span class="disponible-label amarillo">⚠️</span>'
+            : '<span class="disponible-label rojo">❌</span>';
+
+          return `
+            <tr>
+              <td>${i.talla}</td>
+              <td>${etiqueta}${i.disponible}</td>
+            </tr>`;
+        }).join('');
+
+        div.innerHTML = `
+        <div class="card-inner">
+          <div class="card-front">
+            <img class="producto-img" src="${producto.imagen_url}" alt="Zapato">
+          </div>
+          <div class="card-back">
+            <div class="info-back">
+              <h3>${producto.nombre} - ${producto.codigo}</h3>
+              <p>${producto.marca}</p>
+              <p>Q ${producto.precio.toFixed(2)}</p>
+              <table class="talla-lista">
+                <thead><tr><th>Talla</th><th>Disponible</th></tr></thead>
+                <tbody>${filas}</tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+
+
+        contenedor.appendChild(div);
+      }
+    }
+
+    function llenarDatalists(data) {
+      const codigos = [...new Set(data.map(i => i.codigo))];
+      const nombres = [...new Set(data.map(i => i.nombre))];
+      const marcas = [...new Set(data.map(i => i.marca))];
+      const tallas = [...new Set(data.map(i => i.talla))];
+
+      const setDatalist = (id, values) => {
+        const list = document.getElementById(id);
+        list.innerHTML = '';
+        values.forEach(v => {
+          const option = document.createElement('option');
+          option.value = v;
+          list.appendChild(option);
+        });
+      };
+
+      setDatalist('codigos', codigos);
+      setDatalist('nombres', nombres);
+      setDatalist('marcas', marcas);
+      setDatalist('tallas', tallas);
+    }
+
+    function limpiarFiltros() {
+      ['filtroCodigo', 'filtroNombre', 'filtroMarca', 'filtroTalla'].forEach(id => {
+        document.getElementById(id).value = '';
+      });
+      document.getElementById('filtroDisponible').value = 'disponibles';
+      cargarInventario();
+    }
+
+    cargarInventario();
+  </script>
+</body>
+</html>

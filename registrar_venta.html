@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Registrar Venta - ZAPATONGT</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="js/supabase-client.js"></script>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <div id="header"></div>
+
+  <!-- Filtros y cliente -->
+  <div id="filtros-container">
+    <select id="cliente-select"></select>
+
+    <input list="codigos" type="text" id="filtroCodigo" placeholder="🔍 Código">
+    <datalist id="codigos"></datalist>
+
+    <input list="nombres" type="text" id="filtroNombre" placeholder="👟 Nombre">
+    <datalist id="nombres"></datalist>
+
+    <input list="marcas" type="text" id="filtroMarca" placeholder="🏷️ Marca">
+    <datalist id="marcas"></datalist>
+
+    <input list="tallas" type="text" id="filtroTalla" placeholder="📏 Talla">
+    <datalist id="tallas"></datalist>
+
+    <button onclick="filtrarProductos()">Buscar</button>
+    <button onclick="limpiarFiltros()">Limpiar</button>
+  </div>
+
+  <p id="contador-resultados"></p>
+
+  <!-- Tarjetas de productos -->
+  <div id="productos-container" class="grid-contenedor"></div>
+
+  <!-- Carrito de venta -->
+  <h2>🛒 Carrito de Venta</h2>
+  <table id="carrito-table">
+    <thead>
+      <tr>
+        <th>Código</th>
+        <th>Nombre</th>
+        <th>Talla</th>
+        <th>Cantidad</th>
+        <th>Precio</th>
+        <th>Subtotal</th>
+        <th>Quitar</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <p id="total-carrito">Total: Q 0.00</p>
+
+  <button onclick="registrarVenta()">✅ Registrar Venta</button>
+
+  <div id="footer"></div>
+
+  <script>
+    let productos = [];
+    let seleccionados = [];
+
+    (async () => {
+      document.getElementById("header").innerHTML = await fetch('header.html').then(r => r.text());
+      document.getElementById("footer").innerHTML = await fetch('footer.html').then(r => r.text());
+      await cargarClientes();
+      await cargarProductos();
+    })();
+
+    async function cargarClientes() {
+      const { data, error } = await supabase.from('CLIENTE').select('*');
+      if (error) return alert('Error cargando clientes');
+      const select = document.getElementById('cliente-select');
+      select.innerHTML = '<option value="">Seleccione cliente</option>';
+      data.forEach(cliente => {
+        const option = document.createElement('option');
+        option.value = cliente.id;
+        option.textContent = cliente.nombre;
+        select.appendChild(option);
+      });
+    }
+
+    async function cargarProductos() {
+      const { data, error } = await supabase.from('INVENTARIO').select('*').gt('disponible', 0);
+      if (error) return alert('Error cargando productos');
+      productos = data;
+      llenarDatalists(data);
+      filtrarProductos();
+    }
+
+    function filtrarProductos() {
+      const codigo = document.getElementById('filtroCodigo').value.trim().toLowerCase();
+      const nombre = document.getElementById('filtroNombre').value.trim().toLowerCase();
+      const marca = document.getElementById('filtroMarca').value.trim().toLowerCase();
+      const talla = document.getElementById('filtroTalla').value.trim();
+
+      let filtrados = productos;
+      if (codigo) filtrados = filtrados.filter(p => p.codigo.toLowerCase().includes(codigo));
+      if (nombre) filtrados = filtrados.filter(p => p.nombre.toLowerCase().includes(nombre));
+      if (marca) filtrados = filtrados.filter(p => p.marca.toLowerCase().includes(marca));
+      if (talla) filtrados = filtrados.filter(p => p.talla == talla);
+
+      mostrarProductos(filtrados);
+    }
+
+    function mostrarProductos(productosFiltrados) {
+      const contenedor = document.getElementById('productos-container');
+      contenedor.innerHTML = '';
+      document.getElementById("contador-resultados").textContent = `Mostrando ${productosFiltrados.length} tallas`;
+
+      const agrupado = {};
+      productosFiltrados.forEach(item => {
+        if (!agrupado[item.codigo]) agrupado[item.codigo] = [];
+        agrupado[item.codigo].push(item);
+      });
+
+      for (const [codigo, items] of Object.entries(agrupado)) {
+        const producto = items[0];
+        const div = document.createElement('div');
+        div.className = 'card';
+
+        const opcionesTalla = items
+          .filter(i => i.disponible > 0)
+          .sort((a, b) => parseFloat(a.talla) - parseFloat(b.talla))
+          .map(i => `<option value="${i.id}" data-disponible="${i.disponible}" data-precio="${i.precio}" data-talla="${i.talla}">Talla ${i.talla} - ${i.disponible} disp.</option>`)
+          .join('');
+
+        div.innerHTML = `
+          <div class="card-inner">
+            <div class="card-front">
+              <img class="producto-img" src="${producto.imagen_url}" alt="Zapato">
+            </div>
+            <div class="card-back">
+              <div class="info-back">
+                <h3>${producto.nombre} - ${producto.codigo}</h3>
+                <p>${producto.marca}</p>
+                <p>Q ${producto.precio.toFixed(2)}</p>
+                <label>Talla:
+                  <select id="select-talla-${codigo}">${opcionesTalla}</select>
+                </label>
+                <input type="number" id="cantidad-${codigo}" placeholder="Cantidad" min="1">
+                <button onclick="agregarProducto('${codigo}')">Agregar a venta</button>
+              </div>
+            </div>
+          </div>
+        `;
+        contenedor.appendChild(div);
+      }
+    }
+
+    function agregarProducto(codigo) {
+    const select = document.getElementById(`select-talla-${codigo}`);
+    const input = document.getElementById(`cantidad-${codigo}`);
+    const productoId = parseInt(select.value);
+    const disponible = parseInt(select.selectedOptions[0].dataset.disponible);
+    const precio = parseFloat(select.selectedOptions[0].dataset.precio);
+    const talla = select.selectedOptions[0].dataset.talla;
+    const cantidad = parseInt(input.value);
+
+    if (!cantidad || cantidad < 1) {
+      return alert('Cantidad inválida');
+    }
+
+    // Calcular cantidad ya agregada de este productoId
+    const yaAgregados = seleccionados
+      .filter(p => p.productoId === productoId)
+      .reduce((suma, p) => suma + p.cantidad, 0);
+
+    if ((yaAgregados + cantidad) > disponible) {
+      return alert(`Ya tienes ${yaAgregados} en el carrito. Solo puedes agregar ${disponible - yaAgregados} más.`);
+    }
+
+    // Ver si ya existe una entrada idéntica (por talla/código)
+    const existente = seleccionados.find(p => p.productoId === productoId);
+
+    if (existente) {
+      existente.cantidad += cantidad;
+      existente.subtotal = existente.cantidad * existente.precio;
+    } else {
+      seleccionados.push({
+        productoId,
+        cantidad,
+        precio,
+        subtotal: precio * cantidad,
+        talla,
+        codigo
+      });
+    }
+
+    input.value = '';
+    actualizarCarrito();
+    alert(`Agregado: ${codigo} - Talla ${talla} x${cantidad}`);
+  }
+
+
+    function actualizarCarrito() {
+      const tbody = document.querySelector('#carrito-table tbody');
+      tbody.innerHTML = '';
+
+      let total = 0;
+
+      seleccionados.forEach((item, index) => {
+        const producto = productos.find(p => p.id === item.productoId);
+        total += item.subtotal;
+
+        const fila = document.createElement('tr');
+        fila.innerHTML = `
+          <td>${item.codigo}</td>
+          <td>${producto.nombre}</td>
+          <td>${item.talla}</td>
+          <td>${item.cantidad}</td>
+          <td>Q ${item.precio.toFixed(2)}</td>
+          <td>Q ${item.subtotal.toFixed(2)}</td>
+          <td><button onclick="quitarDelCarrito(${index})">🗑️</button></td>
+        `;
+        tbody.appendChild(fila);
+      });
+
+      document.getElementById('total-carrito').textContent = `Total: Q ${total.toFixed(2)}`;
+    }
+
+    function quitarDelCarrito(index) {
+      seleccionados.splice(index, 1);
+      actualizarCarrito();
+    }
+
+    async function registrarVenta() {
+      const clienteId = parseInt(document.getElementById('cliente-select').value);
+      if (!clienteId) return alert('Selecciona un cliente');
+      if (seleccionados.length === 0) return alert('No se agregaron productos');
+
+      const total = seleccionados.reduce((s, d) => s + d.subtotal, 0);
+
+      const { data: venta, error: errorVenta } = await supabase
+        .from('VENTAS')
+        .insert([{ cliente_id: clienteId, total: 0 }])
+        .select()
+        .single();
+
+      if (errorVenta) return alert('Error al registrar venta');
+
+      // Validación extra de stock antes de registrar
+      for (const d of seleccionados) {
+        const inventarioActual = productos.find(p => p.id === d.productoId);
+        if (!inventarioActual || d.cantidad > inventarioActual.disponible) {
+          return alert(`El producto ${d.codigo} (Talla ${d.talla}) ya no tiene suficiente inventario.`);
+        }
+      }
+
+
+      for (const d of seleccionados) {
+        await supabase.from('DETALLE_VENTAS').insert([{
+          venta_id: venta.id,
+          producto_id: d.productoId,
+          cantidad: d.cantidad,
+          precio_unitario: d.precio,
+          descuento: 0,
+          subtotal: d.subtotal
+        }]);
+
+        await supabase.from('INVENTARIO').update({
+          disponible: productos.find(p => p.id === d.productoId).disponible - d.cantidad
+        }).eq('id', d.productoId);
+      }
+
+      await supabase.from('VENTAS').update({ total }).eq('id', venta.id);
+      alert('Venta registrada con éxito');
+      location.reload();
+    }
+
+    function limpiarFiltros() {
+      ['filtroCodigo', 'filtroNombre', 'filtroMarca', 'filtroTalla'].forEach(id => {
+        document.getElementById(id).value = '';
+      });
+      filtrarProductos();
+    }
+
+    function llenarDatalists(data) {
+      const codigos = [...new Set(data.map(i => i.codigo))];
+      const nombres = [...new Set(data.map(i => i.nombre))];
+      const marcas = [...new Set(data.map(i => i.marca))];
+      const tallas = [...new Set(data.map(i => i.talla))];
+
+      const setDatalist = (id, values) => {
+        const list = document.getElementById(id);
+        list.innerHTML = '';
+        values.forEach(v => {
+          const option = document.createElement('option');
+          option.value = v;
+          list.appendChild(option);
+        });
+      };
+
+      setDatalist('codigos', codigos);
+      setDatalist('nombres', nombres);
+      setDatalist('marcas', marcas);
+      setDatalist('tallas', tallas);
+    }
+  </script>
+</body>
+</html>

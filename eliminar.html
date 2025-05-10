@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Eliminar Artículo - ZAPATONGT</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="js/supabase-client.js"></script>
+  <style>
+    .eliminar-container {
+      font-family: sans-serif;
+      padding: 20px;
+      max-width: 800px;
+      margin: auto;
+    }
+
+    .eliminar-container h1 {
+      margin-bottom: 20px;
+    }
+
+    .eliminar-container button {
+      padding: 6px;
+      margin: 8px 0;
+      width: 100%;
+      box-sizing: border-box;
+      background-color: #d43c6f;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .eliminar-container button:hover {
+      background-color: #b03259;
+    }
+
+    .eliminar-container .secundario {
+      background-color: #ccc;
+      color: black;
+    }
+
+    .producto-grupo {
+      border: 1px solid #ddd;
+      padding: 15px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+    }
+
+    .producto-grupo img {
+      max-width: 150px;
+      display: block;
+      margin-bottom: 10px;
+    }
+
+    .talla-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid #eee;
+    }
+
+    .talla-row span {
+      flex: 1;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="header"></div>
+
+  <div class="eliminar-container">
+    <h1>Eliminar Artículo - ZAPATONGT</h1>
+    <div id="resultado">Cargando...</div>
+  </div>
+
+  <div id="footer"></div>
+
+  <script>
+    (async () => {
+      try {
+        document.getElementById("header").innerHTML = await fetch('header.html').then(r => r.text());
+        document.getElementById("footer").innerHTML = await fetch('footer.html').then(r => r.text());
+        cargarInventario();
+      } catch (e) {
+        console.error('Error cargando header/footer:', e);
+      }
+    })();
+
+    async function cargarInventario() {
+      const contenedor = document.getElementById('resultado');
+      contenedor.innerHTML = 'Cargando...';
+
+      const { data, error } = await supabase
+        .from('INVENTARIO')
+        .select('*')
+        .gt('disponible', 0); // solo donde disponible > 0
+
+      if (error) {
+        contenedor.innerHTML = '<p>Error al cargar inventario.</p>';
+        console.error(error);
+        return;
+      }
+
+      if (!data.length) {
+        contenedor.innerHTML = '<p>No hay artículos con disponibilidad.</p>';
+        return;
+      }
+
+      const agrupado = {};
+      data.forEach(item => {
+        if (!agrupado[item.codigo]) agrupado[item.codigo] = [];
+        agrupado[item.codigo].push(item);
+      });
+
+      contenedor.innerHTML = '';
+
+      for (const [codigo, items] of Object.entries(agrupado)) {
+        const producto = items[0];
+        const div = document.createElement('div');
+        div.className = 'producto-grupo';
+
+        const tallasHtml = items.map(row => `
+          <div class="talla-row">
+            <span>Talla: ${row.talla}</span>
+            <span>Disponible: ${row.disponible}</span>
+            <span>Q${row.precio.toFixed(2)}</span>
+            <button class="secundario" onclick="marcarTallaComoCero(${row.id})">Marcar como 0</button>
+          </div>
+        `).join('');
+
+        div.innerHTML = `
+          <img src="${producto.imagen_url}" alt="Producto" />
+          <p><strong>Nombre:</strong> ${producto.nombre}</p>
+          <p><strong>Código:</strong> ${producto.codigo}</p>
+          <p><strong>Marca:</strong> ${producto.marca}</p>
+          <button onclick="marcarArticuloComoCero('${producto.codigo}')">Marcar artículo completo como 0</button>
+          <div style="margin-top: 15px;">
+            <h4>Tallas:</h4>
+            ${tallasHtml}
+          </div>
+        `;
+
+        contenedor.appendChild(div);
+      }
+    }
+
+    async function marcarTallaComoCero(id) {
+      if (!confirm('¿Estás seguro de poner la cantidad disponible en 0 para esta talla?')) return;
+
+      const { error } = await supabase
+        .from('INVENTARIO')
+        .update({ disponible: 0 })
+        .eq('id', id);
+
+      if (error) {
+        alert('Error al actualizar talla: ' + error.message);
+      } else {
+        alert('Talla actualizada');
+        cargarInventario();
+      }
+    }
+
+    async function marcarArticuloComoCero(codigo) {
+      if (!confirm(`¿Estás seguro de poner en 0 todas las tallas del artículo con código ${codigo}?`)) return;
+
+      const { error } = await supabase
+        .from('INVENTARIO')
+        .update({ disponible: 0 })
+        .eq('codigo', codigo)
+        .gt('disponible', 0);
+
+      if (error) {
+        alert('Error al actualizar artículo: ' + error.message);
+      } else {
+        alert('Artículo actualizado');
+        cargarInventario();
+      }
+    }
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Agregar Artículo - ZAPATONGT</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="js/supabase-client.js"></script>
+</head>
+<body>
+
+<body>
+
+<div id="header"></div>
+
+<div class="agregar-container">
+  <h1>Agregar Artículo - ZAPATONGT</h1>
+
+  <form onsubmit="agregarArticulo(); return false;">
+    <label for="nombre">Nombre:</label>
+    <input type="text" id="nombre" required>
+
+    <label for="codigo">Código:</label>
+    <input type="text" id="codigo" required>
+
+    <label for="marca">Marca:</label>
+    <input type="text" id="marca" required>
+
+    <label for="imagen">Selecciona una imagen:</label>
+    <input type="file" id="imagen" accept="image/*" required>
+
+    <label for="precio">Precio:</label>
+    <input type="number" id="precio" placeholder="Precio" step="0.01" required>
+
+    <label>Tallas y cantidad disponible:</label>
+    <div id="talla-container"></div>
+
+    <button type="submit">Guardar artículo</button>
+  </form>
+</div>
+
+<div id="footer"></div>
+
+
+<script>
+(async () => {
+  try {
+    const header = await fetch('header.html').then(r => r.text());
+    document.getElementById("header").innerHTML = header;
+    const footer = await fetch('footer.html').then(r => r.text());
+    document.getElementById("footer").innerHTML = footer;
+    generarTallasPorDefecto();
+  } catch (e) {
+    console.error('Error cargando header/footer:', e);
+  }
+})();
+
+function generarTallasPorDefecto() {
+  const tallas = [22, 22.5, 23, 23.5, 24, 24.5, 25, 25.5];
+  const container = document.getElementById('talla-container');
+  container.innerHTML = '';
+
+  for (let t of tallas) {
+    const fila = document.createElement('div');
+    fila.style.display = 'flex';
+    fila.style.gap = '10px';
+    fila.style.marginBottom = '8px';
+
+    fila.innerHTML = `
+      <input type="number" class="talla" value="${t}" step="0.5" readonly>
+      <input type="number" class="disponible" placeholder="Disponible">
+    `;
+    container.appendChild(fila);
+  }
+}
+
+async function agregarArticulo() {
+  const nombre = document.getElementById('nombre').value.trim();
+  const codigo = document.getElementById('codigo').value.trim();
+  const marca = document.getElementById('marca').value.trim();
+  const precio = parseFloat(document.getElementById('precio').value);
+  const archivo = document.getElementById('imagen').files[0];
+
+  const tallas = document.querySelectorAll('.talla');
+  const disponibles = document.querySelectorAll('.disponible');
+
+  if (!nombre || !codigo || !marca || !archivo || isNaN(precio)) {
+    alert('Completa todos los campos obligatorios correctamente.');
+    return;
+  }
+
+  const nombreArchivo = `${codigo}_${Date.now()}.${archivo.name.split('.').pop()}`;
+  const { data: uploadData, error: uploadError } = await supabase
+    .storage
+    .from('zapatongt-imagenes') // Cambia si tu bucket tiene otro nombre
+    .upload(nombreArchivo, archivo);
+
+  if (uploadError) {
+    alert('Error al subir imagen');
+    console.error(uploadError);
+    return;
+  }
+
+  const { data: publicUrlData } = supabase
+    .storage
+    .from('zapatongt-imagenes')
+    .getPublicUrl(nombreArchivo);
+
+  const imagen_url = publicUrlData.publicUrl;
+
+  const registros = [];
+
+  for (let i = 0; i < tallas.length; i++) {
+    const talla = parseFloat(tallas[i].value);
+    const cantidadInput = disponibles[i].value.trim();
+    let disponible = cantidadInput === '' ? 0 : parseInt(cantidadInput);
+
+    if (isNaN(disponible) || disponible < 0) {
+      alert(`La cantidad para la talla ${talla} debe ser 0 o mayor.`);
+      return;
+    }
+
+    registros.push({
+      nombre,
+      codigo,
+      marca,
+      imagen_url,
+      talla,
+      disponible,
+      precio
+    });
+  }
+
+  const { error } = await supabase.from('INVENTARIO').insert(registros);
+  if (error) {
+    alert('Error al guardar artículo');
+    console.error(error);
+  } else {
+    alert('Artículo guardado con éxito');
+    document.querySelector('form').reset();
+    generarTallasPorDefecto();
+  }
+}
+</script>
+
+</body>
+</html>

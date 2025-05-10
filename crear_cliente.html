@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Crear Cliente - ZAPATONGT</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="js/supabase-client.js"></script>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <div id="header"></div>
+
+  <main class="contenido">
+    <h1>🧍 Crear Nuevo Cliente</h1>
+
+    <div class="formulario">
+      <label for="nombre">Nombre:</label>
+      <input type="text" id="nombre" placeholder="Nombre completo" required>
+
+      <label for="telefono">Teléfono:</label>
+      <input type="tel" id="telefono" placeholder="Ej. 12345678" required>
+
+      <label for="direccion">Dirección:</label>
+      <textarea id="direccion" rows="3" placeholder="Ej. Zona 1, Ciudad de Guatemala" required></textarea>
+
+      <label class="checkbox">
+        <input type="checkbox" id="problemas">
+        Problemas
+      </label>
+
+      <button onclick="crearCliente()">💾 Guardar Cliente</button>
+    </div>
+  </main>
+
+  <div id="footer"></div>
+
+  <script>
+    (async () => {
+      document.getElementById("header").innerHTML = await fetch("header.html").then(r => r.text());
+      document.getElementById("footer").innerHTML = await fetch("footer.html").then(r => r.text());
+    })();
+
+    async function crearCliente() {
+      const nombre = document.getElementById('nombre').value.trim();
+      const telefono = document.getElementById('telefono').value.trim();
+      const direccion = document.getElementById('direccion').value.trim();
+      const problemas = document.getElementById('problemas').checked;
+
+      if (!nombre || !telefono || !direccion) {
+        alert('Por favor llena todos los campos requeridos.');
+        return;
+      }
+
+      const { data, error } = await supabase.from('CLIENTE').insert([
+        { nombre, telefono, direccion, problemas }
+      ]);
+
+      if (error) {
+        alert('Error al guardar el cliente.');
+        console.error(error);
+      } else {
+        alert('Cliente creado exitosamente.');
+        window.location.href = 'registrar_ventas.html';
+      }
+    }
+  </script>
+</body>
+</html>

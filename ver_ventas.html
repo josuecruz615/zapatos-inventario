@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Ventas Realizadas - ZAPATONGT</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="js/supabase-client.js"></script>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <div id="header"></div>
+
+  <main class="contenido">
+    <h1>📊 Ventas Realizadas</h1>
+
+    <div id="filtros-container">
+      <label for="fechaInicio">📅 Desde:</label>
+      <input type="date" id="fechaInicio">
+
+      <label for="fechaFin">📅 Hasta:</label>
+      <input type="date" id="fechaFin">
+
+      <button onclick="cargarVentas()">🔍 Filtrar</button>
+    </div>
+
+    <table class="tabla-datos">
+      <thead>
+        <tr>
+          <th>🗓️ Fecha</th>
+          <th>👤 Cliente</th>
+          <th>💰 Total (Q)</th>
+          <th>📦 Detalle</th>
+        </tr>
+      </thead>
+      <tbody id="tabla-ventas">
+        <tr><td colspan="4">Cargando ventas...</td></tr>
+      </tbody>
+    </table>
+  </main>
+
+  <div id="footer"></div>
+
+  <!-- Modal de detalle de venta -->
+  <div id="modal-detalle" class="modal oculto">
+    <div class="modal-contenido">
+      <span class="cerrar" onclick="cerrarModal()">×</span>
+      <h2>🧾 Detalle de Venta</h2>
+      <div id="detalle-contenido"></div>
+    </div>
+  </div>
+
+  <script>
+    (async () => {
+      document.getElementById("header").innerHTML = await fetch("header.html").then(r => r.text());
+      document.getElementById("footer").innerHTML = await fetch("footer.html").then(r => r.text());
+    })();
+
+    async function cargarVentas() {
+      const tabla = document.getElementById('tabla-ventas');
+      tabla.innerHTML = '<tr><td colspan="4">Cargando ventas...</td></tr>';
+
+      const desde = document.getElementById('fechaInicio').value;
+      const hasta = document.getElementById('fechaFin').value;
+
+      let query = supabase.from('VENTAS').select('*, CLIENTE(nombre)').order('created_at', { ascending: false });
+
+      if (desde) query = query.gte('created_at', desde);
+      if (hasta) query = query.lte('created_at', hasta + 'T23:59:59');
+
+      const { data, error } = await query;
+
+      if (error) {
+        tabla.innerHTML = `<tr><td colspan="4">❌ Error: ${error.message}</td></tr>`;
+        return;
+      }
+
+      if (data.length === 0) {
+        tabla.innerHTML = '<tr><td colspan="4">No hay ventas en ese rango.</td></tr>';
+        return;
+      }
+
+      tabla.innerHTML = '';
+      for (const venta of data) {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${new Date(venta.created_at).toLocaleDateString()}</td>
+          <td>${venta.CLIENTE?.nombre || 'Sin cliente'}</td>
+          <td>Q ${venta.total.toFixed(2)}</td>
+          <td><button onclick="verDetalle(${venta.id})">🔍 Ver</button></td>
+        `;
+        tabla.appendChild(row);
+      }
+    }
+
+    async function verDetalle(ventaId) {
+    const { data, error } = await supabase
+      .from('DETALLE_VENTAS')
+      .select('*, INVENTARIO(nombre, talla, imagen_url)')
+      .eq('venta_id', ventaId);
+
+    if (error) return alert('Error al cargar detalle');
+
+    if (!data || data.length === 0) {
+      document.getElementById("detalle-contenido").innerHTML = '<p>No hay detalle disponible.</p>';
+    } else {
+      const html = data.map(d => `
+        <div class="detalle-item">
+          <img src="${d.INVENTARIO.imagen_url}" alt="Producto" class="detalle-img">
+          <div class="detalle-info">
+            <strong>${d.cantidad} x</strong> ${d.INVENTARIO.nombre}<br>
+            Talla: ${d.INVENTARIO.talla}<br>
+            Precio: Q${d.precio_unitario.toFixed(2)}<br>
+            Subtotal: Q${d.subtotal.toFixed(2)}
+          </div>
+        </div>
+        <hr>
+      `).join('');
+      document.getElementById("detalle-contenido").innerHTML = html;
+    }
+
+    document.getElementById("modal-detalle").classList.remove('oculto');
+  }
+
+
+
+
+
+    function cerrarModal() {
+      document.getElementById("modal-detalle").classList.add('oculto');
+    }
+
+    cargarVentas();
+  </script>
+</body>
+</html>
