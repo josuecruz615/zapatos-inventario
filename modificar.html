@@ -100,9 +100,9 @@
                 <input class="nombre" value="${producto.nombre}" placeholder="Nombre"><br>
                 <input class="codigo" value="${producto.codigo}" placeholder="Código"><br>
                 <input class="marca" value="${producto.marca}" placeholder="Marca"><br>
-                <input class="imagen_url" value="${producto.imagen_url}" placeholder="Imagen URL"><br>
                 <input class="precio" value="${producto.precio}" placeholder="Precio"><br>
-
+                <input type="file" class="nueva-imagen"><br>
+                <input type="hidden" class="imagen_url" value="${producto.imagen_url}">
                 <table class="talla-lista">
                   <thead>
                     <tr><th>Talla</th><th>Disponible</th></tr>
@@ -114,7 +114,6 @@
           </div>
           <button class="btn-actualizar" onclick="actualizarGrupo(this)">ACTUALIZAR</button>
         `;
-
 
         contenedor.appendChild(div);
       }
@@ -154,8 +153,32 @@
       const nombre = card.querySelector('.nombre').value.trim();
       const codigo = card.querySelector('.codigo').value.trim();
       const marca = card.querySelector('.marca').value.trim();
-      const imagen_url = card.querySelector('.imagen_url').value.trim();
-      const precio = parseFloat(card.querySelector('.precio').value); // 💡 Esta línea faltaba
+      const precio = parseFloat(card.querySelector('.precio').value);
+      const nuevaImagenInput = card.querySelector('.nueva-imagen');
+      let imagen_url = card.querySelector('.imagen_url').value;
+
+      // Si se seleccionó una nueva imagen, súbela a Supabase Storage
+      if (nuevaImagenInput.files.length > 0) {
+        const archivo = nuevaImagenInput.files[0];
+        const nombreArchivo = `${Date.now()}-${archivo.name}`;
+
+        const { data: uploadData, error: uploadError } = await supabase
+          .storage
+          .from('zapatongt-imagenes')
+          .upload(nombreArchivo, archivo, { cacheControl: '3600', upsert: false });
+
+        if (uploadError) {
+          alert('Error al subir imagen');
+          return;
+        }
+
+        const { data: urlData } = supabase
+          .storage
+          .from('zapatongt-imagenes')
+          .getPublicUrl(nombreArchivo);
+
+        imagen_url = urlData.publicUrl;
+      }
 
       const filas = card.querySelectorAll('tbody tr');
 
@@ -164,19 +187,10 @@
         const talla = row.querySelector('.talla').value;
         const disponible = parseInt(row.querySelector('.disponible').value);
 
-        if (
-            !nombre || 
-            !codigo || 
-            !marca || 
-            isNaN(disponible) || 
-            isNaN(precio) || 
-            !talla || 
-            parseFloat(talla) <= 0 || 
-            disponible < 0
-          ) {
-            alert('Todos los campos deben estar completos, la talla debe ser mayor a 0 y el disponible no puede ser negativo.');
-            return;
-          }
+        if (!nombre || !codigo || !marca || isNaN(disponible) || isNaN(precio) || !talla || parseFloat(talla) <= 0 || disponible < 0) {
+          alert('Todos los campos deben estar completos, la talla debe ser mayor a 0 y el disponible no puede ser negativo.');
+          return;
+        }
 
         const { error } = await supabase
           .from('INVENTARIO')
@@ -192,7 +206,6 @@
       alert('Artículo actualizado con éxito');
       cargarInventario();
     }
-
   </script>
 </body>
 </html>
