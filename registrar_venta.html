@@ -51,7 +51,14 @@
     </thead>
     <tbody></tbody>
   </table>
+
   <p id="total-carrito">Total: Q 0.00</p>
+
+  <!-- Campo de ajuste debajo del total -->
+  <div style="margin-top: 1em;">
+    <label for="ajuste">🧾 Descuento o Recargo (Q):</label>
+    <input type="number" id="ajuste" value="0" step="5">
+  </div>
 
   <button onclick="registrarVenta()">✅ Registrar Venta</button>
 
@@ -150,49 +157,46 @@
     }
 
     function agregarProducto(codigo) {
-    const select = document.getElementById(`select-talla-${codigo}`);
-    const input = document.getElementById(`cantidad-${codigo}`);
-    const productoId = parseInt(select.value);
-    const disponible = parseInt(select.selectedOptions[0].dataset.disponible);
-    const precio = parseFloat(select.selectedOptions[0].dataset.precio);
-    const talla = select.selectedOptions[0].dataset.talla;
-    const cantidad = parseInt(input.value);
+      const select = document.getElementById(`select-talla-${codigo}`);
+      const input = document.getElementById(`cantidad-${codigo}`);
+      const productoId = parseInt(select.value);
+      const disponible = parseInt(select.selectedOptions[0].dataset.disponible);
+      const precio = parseFloat(select.selectedOptions[0].dataset.precio);
+      const talla = select.selectedOptions[0].dataset.talla;
+      const cantidad = parseInt(input.value);
 
-    if (!cantidad || cantidad < 1) {
-      return alert('Cantidad inválida');
+      if (!cantidad || cantidad < 1) {
+        return alert('Cantidad inválida');
+      }
+
+      const yaAgregados = seleccionados
+        .filter(p => p.productoId === productoId)
+        .reduce((suma, p) => suma + p.cantidad, 0);
+
+      if ((yaAgregados + cantidad) > disponible) {
+        return alert(`Ya tienes ${yaAgregados} en el carrito. Solo puedes agregar ${disponible - yaAgregados} más.`);
+      }
+
+      const existente = seleccionados.find(p => p.productoId === productoId);
+
+      if (existente) {
+        existente.cantidad += cantidad;
+        existente.subtotal = existente.cantidad * existente.precio;
+      } else {
+        seleccionados.push({
+          productoId,
+          cantidad,
+          precio,
+          subtotal: precio * cantidad,
+          talla,
+          codigo
+        });
+      }
+
+      input.value = '';
+      actualizarCarrito();
+      alert(`Agregado: ${codigo} - Talla ${talla} x${cantidad}`);
     }
-
-    // Calcular cantidad ya agregada de este productoId
-    const yaAgregados = seleccionados
-      .filter(p => p.productoId === productoId)
-      .reduce((suma, p) => suma + p.cantidad, 0);
-
-    if ((yaAgregados + cantidad) > disponible) {
-      return alert(`Ya tienes ${yaAgregados} en el carrito. Solo puedes agregar ${disponible - yaAgregados} más.`);
-    }
-
-    // Ver si ya existe una entrada idéntica (por talla/código)
-    const existente = seleccionados.find(p => p.productoId === productoId);
-
-    if (existente) {
-      existente.cantidad += cantidad;
-      existente.subtotal = existente.cantidad * existente.precio;
-    } else {
-      seleccionados.push({
-        productoId,
-        cantidad,
-        precio,
-        subtotal: precio * cantidad,
-        talla,
-        codigo
-      });
-    }
-
-    input.value = '';
-    actualizarCarrito();
-    alert(`Agregado: ${codigo} - Talla ${talla} x${cantidad}`);
-  }
-
 
     function actualizarCarrito() {
       const tbody = document.querySelector('#carrito-table tbody');
@@ -230,24 +234,24 @@
       if (!clienteId) return alert('Selecciona un cliente');
       if (seleccionados.length === 0) return alert('No se agregaron productos');
 
-      const total = seleccionados.reduce((s, d) => s + d.subtotal, 0);
+      const totalBase = seleccionados.reduce((s, d) => s + d.subtotal, 0);
+      const ajuste = parseFloat(document.getElementById('ajuste').value) || 0;
+      const total = totalBase + ajuste;
 
       const { data: venta, error: errorVenta } = await supabase
         .from('VENTAS')
-        .insert([{ cliente_id: clienteId, total: 0 }])
+        .insert([{ cliente_id: clienteId, total: 0, ajuste }])
         .select()
         .single();
 
       if (errorVenta) return alert('Error al registrar venta');
 
-      // Validación extra de stock antes de registrar
       for (const d of seleccionados) {
         const inventarioActual = productos.find(p => p.id === d.productoId);
         if (!inventarioActual || d.cantidad > inventarioActual.disponible) {
           return alert(`El producto ${d.codigo} (Talla ${d.talla}) ya no tiene suficiente inventario.`);
         }
       }
-
 
       for (const d of seleccionados) {
         await supabase.from('DETALLE_VENTAS').insert([{

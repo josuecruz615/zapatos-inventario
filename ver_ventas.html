@@ -35,6 +35,13 @@
       <tbody id="tabla-ventas">
         <tr><td colspan="4">Cargando ventas...</td></tr>
       </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="2" style="text-align: right;"><strong>Total General:</strong></td>
+          <td id="total-general">Q 0.00</td>
+          <td></td>
+        </tr>
+      </tfoot>
     </table>
   </main>
 
@@ -71,15 +78,19 @@
 
       if (error) {
         tabla.innerHTML = `<tr><td colspan="4">❌ Error: ${error.message}</td></tr>`;
+        document.getElementById("total-general").textContent = "Q 0.00";
         return;
       }
 
       if (data.length === 0) {
         tabla.innerHTML = '<tr><td colspan="4">No hay ventas en ese rango.</td></tr>';
+        document.getElementById("total-general").textContent = "Q 0.00";
         return;
       }
 
       tabla.innerHTML = '';
+      let totalGeneral = 0;
+
       for (const venta of data) {
         const row = document.createElement('tr');
         row.innerHTML = `
@@ -89,41 +100,40 @@
           <td><button onclick="verDetalle(${venta.id})">🔍 Ver</button></td>
         `;
         tabla.appendChild(row);
+        totalGeneral += venta.total;
       }
+
+      document.getElementById("total-general").textContent = `Q ${totalGeneral.toFixed(2)}`;
     }
 
     async function verDetalle(ventaId) {
-    const { data, error } = await supabase
-      .from('DETALLE_VENTAS')
-      .select('*, INVENTARIO(nombre, talla, imagen_url)')
-      .eq('venta_id', ventaId);
+      const { data, error } = await supabase
+        .from('DETALLE_VENTAS')
+        .select('*, INVENTARIO(nombre, talla, imagen_url)')
+        .eq('venta_id', ventaId);
 
-    if (error) return alert('Error al cargar detalle');
+      if (error) return alert('Error al cargar detalle');
 
-    if (!data || data.length === 0) {
-      document.getElementById("detalle-contenido").innerHTML = '<p>No hay detalle disponible.</p>';
-    } else {
-      const html = data.map(d => `
-        <div class="detalle-item">
-          <img src="${d.INVENTARIO.imagen_url}" alt="Producto" class="detalle-img">
-          <div class="detalle-info">
-            <strong>${d.cantidad} x</strong> ${d.INVENTARIO.nombre}<br>
-            Talla: ${d.INVENTARIO.talla}<br>
-            Precio: Q${d.precio_unitario.toFixed(2)}<br>
-            Subtotal: Q${d.subtotal.toFixed(2)}
+      if (!data || data.length === 0) {
+        document.getElementById("detalle-contenido").innerHTML = '<p>No hay detalle disponible.</p>';
+      } else {
+        const html = data.map(d => `
+          <div class="detalle-item">
+            <img src="${d.INVENTARIO.imagen_url}" alt="Producto" class="detalle-img">
+            <div class="detalle-info">
+              <strong>${d.cantidad} x</strong> ${d.INVENTARIO.nombre}<br>
+              Talla: ${d.INVENTARIO.talla}<br>
+              Precio: Q${d.precio_unitario.toFixed(2)}<br>
+              Subtotal: Q${d.subtotal.toFixed(2)}
+            </div>
           </div>
-        </div>
-        <hr>
-      `).join('');
-      document.getElementById("detalle-contenido").innerHTML = html;
+          <hr>
+        `).join('');
+        document.getElementById("detalle-contenido").innerHTML = html;
+      }
+
+      document.getElementById("modal-detalle").classList.remove('oculto');
     }
-
-    document.getElementById("modal-detalle").classList.remove('oculto');
-  }
-
-
-
-
 
     function cerrarModal() {
       document.getElementById("modal-detalle").classList.add('oculto');

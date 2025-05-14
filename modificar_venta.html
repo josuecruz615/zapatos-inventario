@@ -16,6 +16,12 @@
     <label for="venta-select">Selecciona una venta:</label>
     <select id="venta-select" onchange="cargarDetalleVenta()"></select>
 
+    <!-- Ajuste -->
+    <div style="margin-top: 1em;">
+      <label for="ajuste">🧾 Descuento o Recargo (Q):</label>
+      <input type="number" id="ajuste" step="5" value="0">
+    </div>
+
     <h2>Detalle Actual</h2>
     <table id="detalle-venta">
       <thead>
@@ -41,6 +47,9 @@
       <button onclick="guardarCambios()">💾 Guardar Cambios</button>
       <button onclick="eliminarVenta()" style="background-color: red;">🗑️ Eliminar Venta</button>
     </div>
+
+    <!-- Total Final de la Venta -->
+    <p id="total-venta" style="margin-top: 1em; font-size: 1.2em;"><strong>Total de Venta: Q 0.00</strong></p>
   </main>
 
   <div id="footer"></div>
@@ -77,10 +86,7 @@
     }
 
     async function cargarProductos() {
-      const { data, error } = await supabase
-        .from('INVENTARIO')
-        .select('*');
-
+      const { data, error } = await supabase.from('INVENTARIO').select('*');
       if (error) return alert('Error cargando inventario');
       productos = data;
 
@@ -112,19 +118,25 @@
       const ventaId = document.getElementById('venta-select').value;
       if (!ventaId) return;
 
+      const [ventaRes, detalleRes] = await Promise.all([
+        supabase.from('VENTAS').select('ajuste, total').eq('id', ventaId).single(),
+        supabase.from('DETALLE_VENTAS')
+          .select('id, producto_id, cantidad, precio_unitario, subtotal, INVENTARIO(nombre, talla, imagen_url)')
+          .eq('venta_id', ventaId)
+      ]);
+
+      if (ventaRes.error || detalleRes.error) return alert('Error al cargar detalle');
+
+      document.getElementById('ajuste').value = ventaRes.data.ajuste || 0;
+      document.getElementById('total-venta').innerHTML = `<strong>Total de Venta: Q ${ventaRes.data.total.toFixed(2)}</strong>`;
+
       ventaActual = parseInt(ventaId);
-      const { data, error } = await supabase
-        .from('DETALLE_VENTAS')
-        .select('id, producto_id, cantidad, precio_unitario, subtotal, INVENTARIO(nombre, talla, imagen_url)')
-        .eq('venta_id', ventaId);
+      detalleOriginal = detalleRes.data;
 
-      if (error) return alert('Error al cargar detalle');
-
-      detalleOriginal = data;
       const tbody = document.querySelector('#detalle-venta tbody');
       tbody.innerHTML = '';
 
-      data.forEach((d, index) => {
+      detalleOriginal.forEach((d, index) => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td>
@@ -221,7 +233,14 @@
         total += nuevaCantidad * item.precio_unitario;
       }
 
-      await supabase.from('VENTAS').update({ total }).eq('id', ventaActual);
+      const ajuste = parseInt(document.getElementById('ajuste').value) || 0;
+      total += ajuste;
+
+      await supabase.from('VENTAS').update({ total, ajuste }).eq('id', ventaActual);
+
+      // Actualiza visualmente el total
+      document.getElementById('total-venta').innerHTML = `<strong>Total de Venta: Q ${total.toFixed(2)}</strong>`;
+
       alert('Cambios guardados correctamente');
 
       idsAEliminar = [];
@@ -241,70 +260,49 @@
     }
 
     async function eliminarVenta() {
-  if (!ventaActual) return alert('Selecciona una venta primero.');
-  if (!confirm('¿Estás seguro que deseas eliminar esta venta?')) return;
+      if (!ventaActual) return alert('Selecciona una venta primero.');
+      if (!confirm('¿Estás seguro que deseas eliminar esta venta?')) return;
 
-  try {
-    // 1. Obtener el detalle
-    const { data: detalle, error: errorDetalle } = await supabase
-      .from('DETALLE_VENTAS')
-      .select('producto_id, cantidad')
-      .eq('venta_id', ventaActual);
+      try {
+        const { data: detalle, error: errorDetalle } = await supabase
+          .from('DETALLE_VENTAS')
+          .select('producto_id, cantidad')
+          .eq('venta_id', ventaActual);
+        if (errorDetalle) throw errorDetalle;
 
-    if (errorDetalle) throw errorDetalle;
+        for (const item of detalle) {
+          const { data: inv, error: errorInv } = await supabase
+            .from('INVENTARIO')
+            .select('disponible')
+            .eq('id', item.producto_id)
+            .single();
+          if (errorInv) throw errorInv;
 
-    // 2. Devolver inventario
-    for (const item of detalle) {
-      const { data: inv, error: errorInv } = await supabase
-        .from('INVENTARIO')
-        .select('disponible')
-        .eq('id', item.producto_id)
-        .single();
+          await supabase
+            .from('INVENTARIO')
+            .update({ disponible: inv.disponible + item.cantidad })
+            .eq('id', item.producto_id);
+        }
 
-      if (errorInv) throw errorInv;
+        await supabase.from('DETALLE_VENTAS').delete().eq('venta_id', ventaActual);
 
-      await supabase
-        .from('INVENTARIO')
-        .update({ disponible: inv.disponible + item.cantidad })
-        .eq('id', item.producto_id);
+        const { count: detallesRestantes } = await supabase
+          .from('DETALLE_VENTAS')
+          .select('id', { count: 'exact', head: true })
+          .eq('venta_id', ventaActual);
+
+        if (detallesRestantes > 0) throw new Error('No se eliminaron todos los detalles');
+
+        await supabase.from('VENTAS').delete().eq('id', ventaActual);
+
+        alert('✅ Venta eliminada correctamente');
+        window.location.reload();
+
+      } catch (err) {
+        console.error('❌ Error real al eliminar venta:', err);
+        alert('❌ No se pudo eliminar la venta. Revisa la consola.');
+      }
     }
-
-    // 3. Eliminar los detalles
-    const { error: errorDetalles } = await supabase
-      .from('DETALLE_VENTAS')
-      .delete()
-      .eq('venta_id', ventaActual);
-
-    if (errorDetalles) throw errorDetalles;
-
-    // 4. Verifica que ya no haya detalles
-    const { count: detallesRestantes } = await supabase
-      .from('DETALLE_VENTAS')
-      .select('id', { count: 'exact', head: true })
-      .eq('venta_id', ventaActual);
-
-    if (detallesRestantes > 0) {
-      throw new Error('No se eliminaron todos los detalles, no se puede eliminar la venta.');
-    }
-
-    // 5. Eliminar la venta
-    const { error: errorVenta } = await supabase
-      .from('VENTAS')
-      .delete()
-      .eq('id', ventaActual);
-
-    if (errorVenta) throw errorVenta;
-
-    alert('✅ Venta eliminada correctamente');
-    window.location.reload();
-
-  } catch (err) {
-    console.error('❌ Error real al eliminar venta:', err);
-    alert('❌ No se pudo eliminar la venta. Revisa la consola.');
-  }
-}
-
-    
   </script>
 </body>
 </html>
