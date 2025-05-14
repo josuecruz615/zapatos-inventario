@@ -76,7 +76,11 @@
     })();
 
     async function cargarClientes() {
-      const { data, error } = await supabase.from('CLIENTE').select('*');
+      const { data, error } = await supabase
+        .from('CLIENTE')
+        .select('*')
+        .order('created_at', { ascending: false }); // 🔁 Orden por fecha de creación (desc)
+
       if (error) return alert('Error cargando clientes');
       const select = document.getElementById('cliente-select');
       select.innerHTML = '<option value="">Seleccione cliente</option>';
