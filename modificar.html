@@ -24,6 +24,11 @@
     <input list="tallas" type="text" id="filtroTalla" placeholder="📏 Talla">
     <datalist id="tallas"></datalist>
 
+    <select id="filtroDisponible">
+      <option value="disponibles" selected>✔️ DISPONIBLES</option>
+      <option value="todos">📦 TODOS</option>
+    </select>
+
     <button onclick="cargarInventario()">Buscar</button>
     <button onclick="limpiarFiltros()">Limpiar</button>
   </div>
@@ -51,12 +56,16 @@
       const nombre = document.getElementById('filtroNombre').value.trim().toLowerCase();
       const marca = document.getElementById('filtroMarca').value.trim().toLowerCase();
       const talla = document.getElementById('filtroTalla').value.trim();
+      const disponibleFiltro = document.getElementById('filtroDisponible').value;
 
       let resultados = data;
       if (codigo) resultados = resultados.filter(p => p.codigo.toLowerCase().includes(codigo));
       if (nombre) resultados = resultados.filter(p => p.nombre.toLowerCase().includes(nombre));
       if (marca) resultados = resultados.filter(p => p.marca.toLowerCase().includes(marca));
       if (talla) resultados = resultados.filter(p => p.talla == talla);
+      if (disponibleFiltro === 'disponibles') {
+        resultados = resultados.filter(p => p.disponible > 0);
+      }
 
       const agrupado = {};
       resultados.forEach(item => {
@@ -145,6 +154,7 @@
       ['filtroCodigo', 'filtroNombre', 'filtroMarca', 'filtroTalla'].forEach(id => {
         document.getElementById(id).value = '';
       });
+      document.getElementById('filtroDisponible').value = 'disponibles';
       cargarInventario();
     }
 
