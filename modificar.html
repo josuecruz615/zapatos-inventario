@@ -167,7 +167,19 @@
       const nuevaImagenInput = card.querySelector('.nueva-imagen');
       let imagen_url = card.querySelector('.imagen_url').value;
 
-      // Si se seleccionó una nueva imagen, súbela a Supabase Storage
+      // Validar datos básicos de cada fila
+      const filas = card.querySelectorAll('tbody tr');
+      for (let row of filas) {
+        const talla = row.querySelector('.talla').value;
+        const disponible = parseInt(row.querySelector('.disponible').value);
+
+        if (!nombre || !codigo || !marca || isNaN(disponible) || isNaN(precio) || !talla || parseFloat(talla) <= 0 || disponible < 0) {
+          alert('Todos los campos deben estar completos, la talla debe ser mayor a 0 y el disponible no puede ser negativo.');
+          return;
+        }
+      }
+
+      // Si hay una nueva imagen, subirla y actualizar a todos los registros del mismo grupo
       if (nuevaImagenInput.files.length > 0) {
         const archivo = nuevaImagenInput.files[0];
         const nombreArchivo = `${Date.now()}-${archivo.name}`;
@@ -188,19 +200,27 @@
           .getPublicUrl(nombreArchivo);
 
         imagen_url = urlData.publicUrl;
+
+        // 🔴 Actualiza la imagen en todos los registros con mismo codigo, nombre, marca
+        const { error: updateImagenError } = await supabase
+          .from('INVENTARIO')
+          .update({ imagen_url })
+          .eq('codigo', codigo)
+          .eq('nombre', nombre)
+          .eq('marca', marca);
+
+        if (updateImagenError) {
+          alert('Error al actualizar imagen en todos los registros: ' + updateImagenError.message);
+          return;
+        }
+        console.log(`✅ Imagen actualizada en todos los registros con ${codigo} - ${nombre} - ${marca}`);
       }
 
-      const filas = card.querySelectorAll('tbody tr');
-
+      // Actualizar talla, disponible y precio por fila
       for (let row of filas) {
         const id = row.getAttribute('data-id');
         const talla = row.querySelector('.talla').value;
         const disponible = parseInt(row.querySelector('.disponible').value);
-
-        if (!nombre || !codigo || !marca || isNaN(disponible) || isNaN(precio) || !talla || parseFloat(talla) <= 0 || disponible < 0) {
-          alert('Todos los campos deben estar completos, la talla debe ser mayor a 0 y el disponible no puede ser negativo.');
-          return;
-        }
 
         const { error } = await supabase
           .from('INVENTARIO')
