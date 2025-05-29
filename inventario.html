@@ -172,11 +172,19 @@
       const fechaActual = new Date();
       const fechaHora = fechaActual.toISOString().replace(/[-:]/g, '').replace(/\..+/, '').replace('T', '-');
 
-      imagenes.forEach((img, index) => {
+      let i = 0;
+
+      function abrirSiguiente() {
+        if (i >= imagenes.length) {
+          alert('¡Proceso de descarga finalizado! En iPhone/iPad abre en pestañas para guardar manualmente.');
+          return;
+        }
+
+        const img = imagenes[i];
         const url = img.src;
         const link = document.createElement('a');
         link.href = url;
-        link.download = `img_${fechaHora}_${index + 1}.jpg`;
+        link.download = `img_${fechaHora}_${i + 1}.jpg`;
 
         if (/(iPhone|iPad|iPod)/i.test(navigator.userAgent)) {
           window.open(url, '_blank');
@@ -185,9 +193,12 @@
           link.click();
           document.body.removeChild(link);
         }
-      });
 
-      alert('Proceso de descarga iniciado para las imágenes visibles.');
+        i++;
+        setTimeout(abrirSiguiente, 500);
+      }
+
+      abrirSiguiente();
     }
 
     cargarInventario();
