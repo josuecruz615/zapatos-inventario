@@ -179,7 +179,7 @@
         }
       }
 
-      // Si hay una nueva imagen, subirla y actualizar a todos los registros del mismo grupo
+      // Subir imagen a carpeta FOTOS2 si hay una nueva imagen
       if (nuevaImagenInput.files.length > 0) {
         const archivo = nuevaImagenInput.files[0];
         const nombreArchivo = `${Date.now()}-${archivo.name}`;
@@ -187,7 +187,7 @@
         const { data: uploadData, error: uploadError } = await supabase
           .storage
           .from('zapatongt-imagenes')
-          .upload(nombreArchivo, archivo, { cacheControl: '3600', upsert: false });
+          .upload(`FOTOS2/${nombreArchivo}`, archivo, { cacheControl: '3600', upsert: false });
 
         if (uploadError) {
           alert('Error al subir imagen');
@@ -197,11 +197,11 @@
         const { data: urlData } = supabase
           .storage
           .from('zapatongt-imagenes')
-          .getPublicUrl(nombreArchivo);
+          .getPublicUrl(`FOTOS2/${nombreArchivo}`);
 
         imagen_url = urlData.publicUrl;
 
-        // 🔴 Actualiza la imagen en todos los registros con mismo codigo, nombre, marca
+        // Actualiza la imagen en todos los registros con mismo código, nombre, marca
         const { error: updateImagenError } = await supabase
           .from('INVENTARIO')
           .update({ imagen_url })
