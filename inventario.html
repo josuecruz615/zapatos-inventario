@@ -31,6 +31,7 @@
 
     <button onclick="cargarInventario()">Buscar</button>
     <button onclick="limpiarFiltros()">Limpiar</button>
+    <button onclick="descargarImagenes()">Descargar Imágenes</button>
   </div>
 
   <p id="contador-resultados"></p>
@@ -94,7 +95,6 @@
 
         items.sort((a, b) => parseFloat(a.talla) - parseFloat(b.talla));
 
-
         const filas = items.map(i => {
           const etiqueta = i.disponible > 5
             ? '<span class="disponible-label verde">✔️</span>'
@@ -128,7 +128,6 @@
         </div>
       `;
 
-
         contenedor.appendChild(div);
       }
     }
@@ -161,6 +160,34 @@
       });
       document.getElementById('filtroDisponible').value = 'disponibles';
       cargarInventario();
+    }
+
+    async function descargarImagenes() {
+      const imagenes = document.querySelectorAll('.producto-img');
+      if (imagenes.length === 0) {
+        alert('No hay imágenes para descargar.');
+        return;
+      }
+
+      const fechaActual = new Date();
+      const fechaHora = fechaActual.toISOString().replace(/[-:]/g, '').replace(/\..+/, '').replace('T', '-');
+
+      imagenes.forEach((img, index) => {
+        const url = img.src;
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `img_${fechaHora}_${index + 1}.jpg`;
+
+        if (/(iPhone|iPad|iPod)/i.test(navigator.userAgent)) {
+          window.open(url, '_blank');
+        } else {
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
+      });
+
+      alert('Proceso de descarga iniciado para las imágenes visibles.');
     }
 
     cargarInventario();
