@@ -4,8 +4,38 @@
   <meta charset="UTF-8" />
   <title>Inventario - ZAPATONGT</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
   <script src="js/supabase-client.js"></script>
   <link rel="stylesheet" href="assets/style.css">
+  <style>
+    #modal-progreso {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.7);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      color: #fff;
+      font-size: 1.2em;
+    }
+    #barra-progreso {
+      width: 80%;
+      height: 20px;
+      background: #555;
+      margin-top: 20px;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    #barra-progreso div {
+      height: 100%;
+      width: 0%;
+      background: #4caf50;
+      transition: width 0.2s ease;
+    }
+  </style>
 </head>
 <body>
   <div id="header"></div>
@@ -34,9 +64,16 @@
     <button onclick="descargarImagenes()">Descargar Imágenes</button>
   </div>
 
-  <p id="contador-resultados"></p>
+  <!-- Modal de progreso, solo visible durante la descarga -->
+  <div id="modal-progreso">
+    <p id="texto-progreso">Preparando...</p>
+    <div id="barra-progreso"><div></div></div>
+  </div>
 
-  <div id="inventario-contenedor" class="grid-contenedor"></div>
+  <p id="contador-resultados"></p>
+  <div id="inventario-contenedor" class="grid-contenedor">
+    <p>Usa los filtros y haz clic en "Buscar" para ver los productos.</p>
+  </div>
 
   <div id="footer"></div>
 
@@ -44,6 +81,7 @@
     (async () => {
       document.getElementById("header").innerHTML = await fetch('header.html').then(r => r.text());
       document.getElementById("footer").innerHTML = await fetch('footer.html').then(r => r.text());
+      // No cargamos inventario al inicio
     })();
 
     async function cargarInventario() {
@@ -101,33 +139,26 @@
             : i.disponible > 0
             ? '<span class="disponible-label amarillo">⚠️</span>'
             : '<span class="disponible-label rojo">❌</span>';
-
-          return `
-            <tr>
-              <td>${i.talla}</td>
-              <td>${etiqueta}${i.disponible}</td>
-            </tr>`;
+          return `<tr><td>${i.talla}</td><td>${etiqueta}${i.disponible}</td></tr>`;
         }).join('');
 
         div.innerHTML = `
-        <div class="card-inner">
-          <div class="card-front">
-            <img class="producto-img" src="${producto.imagen_url}" alt="Zapato">
-          </div>
-          <div class="card-back">
-            <div class="info-back">
-              <h3>${producto.nombre} - ${producto.codigo}</h3>
-              <p>${producto.marca}</p>
-              <p>Q ${producto.precio.toFixed(2)}</p>
-              <table class="talla-lista">
-                <thead><tr><th>Talla</th><th>Disponible</th></tr></thead>
-                <tbody>${filas}</tbody>
-              </table>
+          <div class="card-inner">
+            <div class="card-front">
+              <img class="producto-img" src="${producto.imagen_url}" alt="Zapato">
             </div>
-          </div>
-        </div>
-      `;
-
+            <div class="card-back">
+              <div class="info-back">
+                <h3>${producto.nombre} - ${producto.codigo}</h3>
+                <p>${producto.marca}</p>
+                <p>Q ${producto.precio.toFixed(2)}</p>
+                <table class="talla-lista">
+                  <thead><tr><th>Talla</th><th>Disponible</th></tr></thead>
+                  <tbody>${filas}</tbody>
+                </table>
+              </div>
+            </div>
+          </div>`;
         contenedor.appendChild(div);
       }
     }
@@ -137,7 +168,6 @@
       const nombres = [...new Set(data.map(i => i.nombre))];
       const marcas = [...new Set(data.map(i => i.marca))];
       const tallas = [...new Set(data.map(i => i.talla))];
-
       const setDatalist = (id, values) => {
         const list = document.getElementById(id);
         list.innerHTML = '';
@@ -147,7 +177,6 @@
           list.appendChild(option);
         });
       };
-
       setDatalist('codigos', codigos);
       setDatalist('nombres', nombres);
       setDatalist('marcas', marcas);
@@ -159,49 +188,65 @@
         document.getElementById(id).value = '';
       });
       document.getElementById('filtroDisponible').value = 'disponibles';
-      cargarInventario();
+      document.getElementById('inventario-contenedor').innerHTML = '<p>Usa los filtros y haz clic en "Buscar" para ver los productos.</p>';
+      document.getElementById("contador-resultados").textContent = '';
     }
 
     async function descargarImagenes() {
       const imagenes = document.querySelectorAll('.producto-img');
+      const modal = document.getElementById('modal-progreso');
+      const texto = document.getElementById('texto-progreso');
+      const barra = document.getElementById('barra-progreso').firstElementChild;
+
       if (imagenes.length === 0) {
         alert('No hay imágenes para descargar.');
         return;
       }
 
+      modal.style.display = 'flex';
+      texto.textContent = 'Preparando ZIP...';
+      barra.style.width = '0%';
+
+      const zip = new JSZip();
+      const carpeta = zip.folder('imagenes');
+
       const fechaActual = new Date();
       const fechaHora = fechaActual.toISOString().replace(/[-:]/g, '').replace(/\..+/, '').replace('T', '-');
 
-      let i = 0;
-
-      function abrirSiguiente() {
-        if (i >= imagenes.length) {
-          alert('¡Proceso de descarga finalizado! En iPhone/iPad abre en pestañas para guardar manualmente.');
-          return;
-        }
-
+      for (let i = 0; i < imagenes.length; i++) {
         const img = imagenes[i];
         const url = img.src;
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `img_${fechaHora}_${i + 1}.jpg`;
 
-        if (/(iPhone|iPad|iPod)/i.test(navigator.userAgent)) {
-          window.open(url, '_blank');
-        } else {
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-        }
+        texto.textContent = `Descargando imagen ${i + 1} de ${imagenes.length}...`;
+        barra.style.width = `${((i + 1) / imagenes.length) * 100}%`;
 
-        i++;
-        setTimeout(abrirSiguiente, 500);
+        const respuesta = await fetch(url);
+        const blob = await respuesta.blob();
+
+        const nombreArchivo = `img_${fechaHora}_${i + 1}.jpg`;
+        carpeta.file(nombreArchivo, blob);
       }
 
-      abrirSiguiente();
-    }
+      texto.textContent = 'Generando ZIP (esto puede tardar un poco)...';
+      barra.style.width = '100%';
 
-    cargarInventario();
+      const contenidoZip = await zip.generateAsync(
+        { type: 'blob', streamFiles: true },
+        (metadata) => {
+          texto.textContent = `Generando ZIP: ${Math.floor(metadata.percent)}%`;
+        }
+      );
+
+      const enlaceDescarga = document.createElement('a');
+      enlaceDescarga.href = URL.createObjectURL(contenidoZip);
+      enlaceDescarga.download = `imagenes_${fechaHora}.zip`;
+      document.body.appendChild(enlaceDescarga);
+      enlaceDescarga.click();
+      document.body.removeChild(enlaceDescarga);
+
+      modal.style.display = 'none';
+      alert('¡Descarga del ZIP iniciada!');
+    }
   </script>
 </body>
 </html>
