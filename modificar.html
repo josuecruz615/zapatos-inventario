@@ -46,17 +46,22 @@
     })();
 
     async function cargarInventario() {
+      // 1. Cargar TODO el inventario
       const { data: dataCompleta, error } = await supabase.from('INVENTARIO').select('*');
       if (error) return alert('Error al cargar inventario');
 
+      console.log('Inventario completo:', dataCompleta); // DEBUG
+
       llenarDatalists(dataCompleta);
 
+      // 2. Leer filtros
       const codigo = document.getElementById('filtroCodigo').value.trim().toLowerCase();
       const nombre = document.getElementById('filtroNombre').value.trim().toLowerCase();
       const marca = document.getElementById('filtroMarca').value.trim().toLowerCase();
       const tallaFiltro = document.getElementById('filtroTalla').value.trim();
       const disponibleFiltro = document.getElementById('filtroDisponible').value;
 
+      // 3. Filtrar para elegir qué códigos mostrar
       let productosFiltrados = dataCompleta;
       if (codigo) productosFiltrados = productosFiltrados.filter(p => p.codigo.toLowerCase().includes(codigo));
       if (nombre) productosFiltrados = productosFiltrados.filter(p => p.nombre.toLowerCase().includes(nombre));
@@ -67,6 +72,7 @@
       }
 
       const codigosUnicos = [...new Set(productosFiltrados.map(item => item.codigo))];
+
       const contenedor = document.getElementById('inventario-contenedor');
       contenedor.innerHTML = '';
 
@@ -79,8 +85,11 @@
       document.getElementById("contador-resultados").textContent =
         `Mostrando ${codigosUnicos.length} productos distintos.`;
 
+      // 4. Para cada código, mostrar TODAS sus tallas (sin filtrar)
       for (const codigoProducto of codigosUnicos) {
         const items = dataCompleta.filter(p => p.codigo === codigoProducto);
+        console.log(`Tallas encontradas para ${codigoProducto}:`, items); // DEBUG
+
         if (items.length === 0) continue;
 
         const producto = items[0];
