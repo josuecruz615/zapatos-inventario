@@ -10,6 +10,7 @@
 <body>
   <div id="header"></div>
 
+  <!-- Filtros de búsqueda -->
   <div id="filtros-container">
     <input list="codigos" type="text" id="filtroCodigo" placeholder="🔍 Código">
     <datalist id="codigos"></datalist>
@@ -46,62 +47,59 @@
     })();
 
     async function cargarInventario() {
-      const { data: dataCompleta, error } = await supabase.from('INVENTARIO').select('*');
+      const { data, error } = await supabase.from('INVENTARIO').select('*');
       if (error) return alert('Error al cargar inventario');
 
-      llenarDatalists(dataCompleta);
+      llenarDatalists(data);
 
       const codigo = document.getElementById('filtroCodigo').value.trim().toLowerCase();
       const nombre = document.getElementById('filtroNombre').value.trim().toLowerCase();
       const marca = document.getElementById('filtroMarca').value.trim().toLowerCase();
-      const tallaFiltro = document.getElementById('filtroTalla').value.trim();
+      const talla = document.getElementById('filtroTalla').value.trim();
       const disponibleFiltro = document.getElementById('filtroDisponible').value;
 
-      // Filtramos solo para decidir qué productos mostrar
-      let productosFiltrados = dataCompleta;
-      if (codigo) productosFiltrados = productosFiltrados.filter(p => p.codigo.toLowerCase().includes(codigo));
-      if (nombre) productosFiltrados = productosFiltrados.filter(p => p.nombre.toLowerCase().includes(nombre));
-      if (marca) productosFiltrados = productosFiltrados.filter(p => p.marca.toLowerCase().includes(marca));
-      if (tallaFiltro) productosFiltrados = productosFiltrados.filter(p => p.talla == tallaFiltro);
-
-      // Solo filtrar los códigos que tengan stock > 0 si el filtro lo pide
-      let codigosUnicos;
+      let resultados = data;
+      if (codigo) resultados = resultados.filter(p => p.codigo.toLowerCase().includes(codigo));
+      if (nombre) resultados = resultados.filter(p => p.nombre.toLowerCase().includes(nombre));
+      if (marca) resultados = resultados.filter(p => p.marca.toLowerCase().includes(marca));
+      if (talla) resultados = resultados.filter(p => p.talla == talla);
       if (disponibleFiltro === 'disponibles') {
-        const disponibles = dataCompleta.filter(p => p.disponible > 0);
-        codigosUnicos = [...new Set(disponibles.map(item => item.codigo))];
-      } else {
-        codigosUnicos = [...new Set(productosFiltrados.map(item => item.codigo))];
+        resultados = resultados.filter(p => p.disponible > 0);
       }
+
+      const agrupado = {};
+      resultados.forEach(item => {
+        if (!agrupado[item.codigo]) agrupado[item.codigo] = [];
+        agrupado[item.codigo].push(item);
+      });
 
       const contenedor = document.getElementById('inventario-contenedor');
       contenedor.innerHTML = '';
 
-      if (codigosUnicos.length === 0) {
+      if (resultados.length === 0) {
         contenedor.innerHTML = '<p>No se encontraron productos con esos filtros.</p>';
         document.getElementById("contador-resultados").textContent = '';
         return;
       }
 
       document.getElementById("contador-resultados").textContent =
-        `Mostrando ${codigosUnicos.length} productos distintos.`;
+        Mostrando ${Object.keys(agrupado).length} productos distintos.;
 
-      // 🔑 Mostrar TODAS las tallas de cada producto
-      for (const codigoProducto of codigosUnicos) {
-        const items = dataCompleta.filter(p => p.codigo === codigoProducto);
-        const producto = items[0]; // Referencia para los datos generales
+      for (const [codigo, items] of Object.entries(agrupado)) {
+        const producto = items[0];
         const div = document.createElement('div');
         div.className = 'card';
 
         items.sort((a, b) => parseFloat(a.talla) - parseFloat(b.talla));
 
-        const filas = items.map(row => `
+        const filas = items.map(row => 
           <tr data-id="${row.id}">
             <td><input class="talla" value="${row.talla}"></td>
             <td><input class="disponible" type="number" value="${row.disponible}"></td>
           </tr>
-        `).join('');
+        ).join('');
 
-        div.innerHTML = `
+        div.innerHTML = 
           <div class="card-inner">
             <div class="card-front">
               <img class="producto-img" src="${producto.imagen_url}" alt="Zapato">
@@ -124,7 +122,7 @@
             </div>
           </div>
           <button class="btn-actualizar" onclick="actualizarGrupo(this)">ACTUALIZAR</button>
-        `;
+        ;
 
         contenedor.appendChild(div);
       }
@@ -169,6 +167,7 @@
       const nuevaImagenInput = card.querySelector('.nueva-imagen');
       let imagen_url = card.querySelector('.imagen_url').value;
 
+      // Validar datos básicos de cada fila
       const filas = card.querySelectorAll('tbody tr');
       for (let row of filas) {
         const talla = row.querySelector('.talla').value;
@@ -180,15 +179,15 @@
         }
       }
 
-      // Si hay imagen nueva, subirla
+      // Subir imagen a carpeta FOTOS2 si hay una nueva imagen
       if (nuevaImagenInput.files.length > 0) {
         const archivo = nuevaImagenInput.files[0];
-        const nombreArchivo = `${Date.now()}-${archivo.name}`;
+        const nombreArchivo = ${Date.now()}-${archivo.name};
 
         const { data: uploadData, error: uploadError } = await supabase
           .storage
           .from('zapatongt-imagenes')
-          .upload(`FOTOS2/${nombreArchivo}`, archivo, { cacheControl: '3600', upsert: false });
+          .upload(FOTOS2/${nombreArchivo}, archivo, { cacheControl: '3600', upsert: false });
 
         if (uploadError) {
           alert('Error al subir imagen');
@@ -198,10 +197,11 @@
         const { data: urlData } = supabase
           .storage
           .from('zapatongt-imagenes')
-          .getPublicUrl(`FOTOS2/${nombreArchivo}`);
+          .getPublicUrl(FOTOS2/${nombreArchivo});
 
         imagen_url = urlData.publicUrl;
 
+        // Actualiza la imagen en todos los registros con mismo código, nombre, marca
         const { error: updateImagenError } = await supabase
           .from('INVENTARIO')
           .update({ imagen_url })
@@ -213,9 +213,10 @@
           alert('Error al actualizar imagen en todos los registros: ' + updateImagenError.message);
           return;
         }
+        console.log(✅ Imagen actualizada en todos los registros con ${codigo} - ${nombre} - ${marca});
       }
 
-      // Actualizar cada talla
+      // Actualizar talla, disponible y precio por fila
       for (let row of filas) {
         const id = row.getAttribute('data-id');
         const talla = row.querySelector('.talla').value;
