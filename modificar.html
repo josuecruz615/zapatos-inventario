@@ -83,7 +83,7 @@
       }
 
       document.getElementById("contador-resultados").textContent =
-        Mostrando ${Object.keys(agrupado).length} productos distintos.;
+        `Mostrando ${Object.keys(agrupado).length} productos distintos.`;
 
       for (const [codigo, items] of Object.entries(agrupado)) {
         const producto = items[0];
@@ -92,14 +92,14 @@
 
         items.sort((a, b) => parseFloat(a.talla) - parseFloat(b.talla));
 
-        const filas = items.map(row => 
+        const filas = items.map(row => `
           <tr data-id="${row.id}">
             <td><input class="talla" value="${row.talla}"></td>
             <td><input class="disponible" type="number" value="${row.disponible}"></td>
           </tr>
-        ).join('');
+        `).join('');
 
-        div.innerHTML = 
+        div.innerHTML = `
           <div class="card-inner">
             <div class="card-front">
               <img class="producto-img" src="${producto.imagen_url}" alt="Zapato">
@@ -122,7 +122,7 @@
             </div>
           </div>
           <button class="btn-actualizar" onclick="actualizarGrupo(this)">ACTUALIZAR</button>
-        ;
+        `;
 
         contenedor.appendChild(div);
       }
@@ -182,12 +182,12 @@
       // Subir imagen a carpeta FOTOS2 si hay una nueva imagen
       if (nuevaImagenInput.files.length > 0) {
         const archivo = nuevaImagenInput.files[0];
-        const nombreArchivo = ${Date.now()}-${archivo.name};
+        const nombreArchivo = `${Date.now()}-${archivo.name}`;
 
         const { data: uploadData, error: uploadError } = await supabase
           .storage
           .from('zapatongt-imagenes')
-          .upload(FOTOS2/${nombreArchivo}, archivo, { cacheControl: '3600', upsert: false });
+          .upload(`FOTOS2/${nombreArchivo}`, archivo, { cacheControl: '3600', upsert: false });
 
         if (uploadError) {
           alert('Error al subir imagen');
@@ -197,7 +197,7 @@
         const { data: urlData } = supabase
           .storage
           .from('zapatongt-imagenes')
-          .getPublicUrl(FOTOS2/${nombreArchivo});
+          .getPublicUrl(`FOTOS2/${nombreArchivo}`);
 
         imagen_url = urlData.publicUrl;
 
@@ -213,7 +213,7 @@
           alert('Error al actualizar imagen en todos los registros: ' + updateImagenError.message);
           return;
         }
-        console.log(✅ Imagen actualizada en todos los registros con ${codigo} - ${nombre} - ${marca});
+        console.log(`✅ Imagen actualizada en todos los registros con ${codigo} - ${nombre} - ${marca}`);
       }
 
       // Actualizar talla, disponible y precio por fila
