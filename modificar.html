@@ -57,17 +57,21 @@
       const tallaFiltro = document.getElementById('filtroTalla').value.trim();
       const disponibleFiltro = document.getElementById('filtroDisponible').value;
 
-      // Filtrar solo para obtener los códigos a mostrar
+      // Filtramos solo para decidir qué productos mostrar
       let productosFiltrados = dataCompleta;
       if (codigo) productosFiltrados = productosFiltrados.filter(p => p.codigo.toLowerCase().includes(codigo));
       if (nombre) productosFiltrados = productosFiltrados.filter(p => p.nombre.toLowerCase().includes(nombre));
       if (marca) productosFiltrados = productosFiltrados.filter(p => p.marca.toLowerCase().includes(marca));
       if (tallaFiltro) productosFiltrados = productosFiltrados.filter(p => p.talla == tallaFiltro);
-      if (disponibleFiltro === 'disponibles') {
-        productosFiltrados = productosFiltrados.filter(p => p.disponible > 0);
-      }
 
-      const codigosUnicos = [...new Set(productosFiltrados.map(item => item.codigo))];
+      // Solo filtrar los códigos que tengan stock > 0 si el filtro lo pide
+      let codigosUnicos;
+      if (disponibleFiltro === 'disponibles') {
+        const disponibles = dataCompleta.filter(p => p.disponible > 0);
+        codigosUnicos = [...new Set(disponibles.map(item => item.codigo))];
+      } else {
+        codigosUnicos = [...new Set(productosFiltrados.map(item => item.codigo))];
+      }
 
       const contenedor = document.getElementById('inventario-contenedor');
       contenedor.innerHTML = '';
@@ -81,11 +85,10 @@
       document.getElementById("contador-resultados").textContent =
         `Mostrando ${codigosUnicos.length} productos distintos.`;
 
+      // 🔑 Mostrar TODAS las tallas de cada producto
       for (const codigoProducto of codigosUnicos) {
-        // 🔑 Aquí cargas TODAS las tallas de ese código (sin importar los filtros previos)
         const items = dataCompleta.filter(p => p.codigo === codigoProducto);
-
-        const producto = items[0];
+        const producto = items[0]; // Referencia para los datos generales
         const div = document.createElement('div');
         div.className = 'card';
 
@@ -177,6 +180,7 @@
         }
       }
 
+      // Si hay imagen nueva, subirla
       if (nuevaImagenInput.files.length > 0) {
         const archivo = nuevaImagenInput.files[0];
         const nombreArchivo = `${Date.now()}-${archivo.name}`;
@@ -211,6 +215,7 @@
         }
       }
 
+      // Actualizar cada talla
       for (let row of filas) {
         const id = row.getAttribute('data-id');
         const talla = row.querySelector('.talla').value;
