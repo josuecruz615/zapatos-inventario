@@ -64,7 +64,6 @@
     <button onclick="descargarImagenes()">Descargar Imágenes</button>
   </div>
 
-  <!-- Modal de progreso, solo visible durante la descarga -->
   <div id="modal-progreso">
     <p id="texto-progreso">Preparando...</p>
     <div id="barra-progreso"><div></div></div>
@@ -78,28 +77,51 @@
   <div id="footer"></div>
 
   <script>
+    let inventarioCompleto = [];
+
     (async () => {
       document.getElementById("header").innerHTML = await fetch('header.html').then(r => r.text());
       document.getElementById("footer").innerHTML = await fetch('footer.html').then(r => r.text());
-      cargarInventario(); // 🚀 ¡Cargamos inventario al inicio!
+      await obtenerInventario();
+      cargarInventario();
     })();
 
-    async function cargarInventario() {
-      const { data, error } = await supabase
-        .from('INVENTARIO')
-        .select('id, codigo, nombre, marca, talla, disponible, precio, imagen_url');
+    async function obtenerInventario() {
+      let desde = 0;
+      const tamanoPagina = 1000;
+      inventarioCompleto = [];
+      let sigue = true;
 
-      if (error) return alert('Error al cargar inventario');
+      while (sigue) {
+        const { data, error } = await supabase
+          .from('INVENTARIO')
+          .select('id, codigo, nombre, marca, talla, disponible, precio, imagen_url')
+          .range(desde, desde + tamanoPagina - 1);
 
-      llenarDatalists(data);
+        if (error) {
+          alert('Error al cargar inventario');
+          console.error(error);
+          break;
+        }
 
+        inventarioCompleto = inventarioCompleto.concat(data);
+        console.log(`Cargados ${inventarioCompleto.length} productos`);
+
+        if (data.length < tamanoPagina) sigue = false;
+        else desde += tamanoPagina;
+      }
+
+      llenarDatalists(inventarioCompleto);
+    }
+
+    function cargarInventario() {
       const codigo = document.getElementById('filtroCodigo').value.trim().toLowerCase();
       const nombre = document.getElementById('filtroNombre').value.trim().toLowerCase();
       const marca = document.getElementById('filtroMarca').value.trim().toLowerCase();
       const talla = document.getElementById('filtroTalla').value.trim();
       const disponibleFiltro = document.getElementById('filtroDisponible').value;
 
-      let resultados = data;
+      let resultados = inventarioCompleto;
       if (codigo) resultados = resultados.filter(p => p.codigo.toLowerCase().includes(codigo));
       if (nombre) resultados = resultados.filter(p => p.nombre.toLowerCase().includes(nombre));
       if (marca) resultados = resultados.filter(p => p.marca.toLowerCase().includes(marca));
@@ -188,8 +210,7 @@
         document.getElementById(id).value = '';
       });
       document.getElementById('filtroDisponible').value = 'disponibles';
-      document.getElementById('inventario-contenedor').innerHTML = '<p>Usa los filtros y haz clic en "Buscar" para ver los productos.</p>';
-      document.getElementById("contador-resultados").textContent = '';
+      cargarInventario();
     }
 
     async function descargarImagenes() {
