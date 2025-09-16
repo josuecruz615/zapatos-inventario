@@ -14,13 +14,10 @@
     <h1>📊 Ventas Realizadas</h1>
 
     <div id="filtros-container">
-      <label for="fechaInicio">📅 Desde:</label>
-      <input type="date" id="fechaInicio">
+      <label for="mesFiltro">📆 Mes:</label>
+      <input type="month" id="mesFiltro">
 
-      <label for="fechaFin">📅 Hasta:</label>
-      <input type="date" id="fechaFin">
-
-      <button onclick="cargarVentas()">🔍 Filtrar</button>
+      <button onclick="cargarVentas()">🔍 Ver ventas</button>
     </div>
 
     <table class="tabla-datos">
@@ -62,17 +59,38 @@
       document.getElementById("footer").innerHTML = await fetch("footer.html").then(r => r.text());
     })();
 
+    function obtenerMesActual() {
+      const hoy = new Date();
+      const mes = String(hoy.getMonth() + 1).padStart(2, '0');
+      return `${hoy.getFullYear()}-${mes}`;
+    }
+
+    function calcularRangoMensual(valorMes) {
+      const mesSeleccionado = valorMes || obtenerMesActual();
+      const [anio, mes] = mesSeleccionado.split('-');
+      const ultimoDia = new Date(parseInt(anio, 10), parseInt(mes, 10), 0).getDate();
+      const fechaInicio = `${anio}-${mes}-01T00:00:00`;
+      const fechaFin = `${anio}-${mes}-${String(ultimoDia).padStart(2, '0')}T23:59:59.999`;
+      return { mesSeleccionado, fechaInicio, fechaFin };
+    }
+
     async function cargarVentas() {
       const tabla = document.getElementById('tabla-ventas');
       tabla.innerHTML = '<tr><td colspan="4">Cargando ventas...</td></tr>';
 
-      const desde = document.getElementById('fechaInicio').value;
-      const hasta = document.getElementById('fechaFin').value;
+      const inputMes = document.getElementById('mesFiltro');
+      const { mesSeleccionado, fechaInicio, fechaFin } = calcularRangoMensual(inputMes?.value);
 
-      let query = supabase.from('VENTAS').select('*, CLIENTE(nombre)').order('created_at', { ascending: false });
+      if (inputMes && !inputMes.value) {
+        inputMes.value = mesSeleccionado;
+      }
 
-      if (desde) query = query.gte('created_at', desde);
-      if (hasta) query = query.lte('created_at', hasta + 'T23:59:59');
+      let query = supabase
+        .from('VENTAS')
+        .select('*, CLIENTE(nombre)')
+        .order('created_at', { ascending: false })
+        .gte('created_at', fechaInicio)
+        .lte('created_at', fechaFin);
 
       const { data, error } = await query;
 
@@ -137,6 +155,12 @@
 
     function cerrarModal() {
       document.getElementById("modal-detalle").classList.add('oculto');
+    }
+
+    const inputMes = document.getElementById('mesFiltro');
+    if (inputMes) {
+      inputMes.value = obtenerMesActual();
+      inputMes.addEventListener('change', cargarVentas);
     }
 
     cargarVentas();
