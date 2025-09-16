@@ -17,7 +17,9 @@
       <label for="mesFiltro">📆 Mes:</label>
       <input type="month" id="mesFiltro">
 
-      <button onclick="cargarVentas()">🔍 Ver ventas</button>
+      <button type="button" onclick="cargarVentas('mes')">🔍 Ver mes</button>
+      <button type="button" onclick="cargarVentas('anio')">📅 Ver año completo</button>
+      <button type="button" onclick="cargarVentas('todo')">⏱️ Ver historial completo</button>
     </div>
 
     <table class="tabla-datos">
@@ -74,23 +76,51 @@
       return { mesSeleccionado, fechaInicio, fechaFin };
     }
 
-    async function cargarVentas() {
+    function calcularRangoAnual(valorMes) {
+      const mesSeleccionado = valorMes || obtenerMesActual();
+      const [anio] = mesSeleccionado.split('-');
+      const fechaInicio = `${anio}-01-01T00:00:00`;
+      const fechaFin = `${anio}-12-31T23:59:59.999`;
+      return { anio, fechaInicio, fechaFin };
+    }
+
+    async function cargarVentas(filtro = 'mes') {
       const tabla = document.getElementById('tabla-ventas');
       tabla.innerHTML = '<tr><td colspan="4">Cargando ventas...</td></tr>';
 
-      const inputMes = document.getElementById('mesFiltro');
-      const { mesSeleccionado, fechaInicio, fechaFin } = calcularRangoMensual(inputMes?.value);
+      const inputMesElemento = document.getElementById('mesFiltro');
+      const valorMes = inputMesElemento?.value || obtenerMesActual();
 
-      if (inputMes && !inputMes.value) {
-        inputMes.value = mesSeleccionado;
+      if (inputMesElemento && !inputMesElemento.value) {
+        inputMesElemento.value = valorMes;
+      }
+
+      let fechaInicio = null;
+      let fechaFin = null;
+
+      if (filtro === 'mes') {
+        const rangoMensual = calcularRangoMensual(valorMes);
+        fechaInicio = rangoMensual.fechaInicio;
+        fechaFin = rangoMensual.fechaFin;
+        if (inputMesElemento) {
+          inputMesElemento.value = rangoMensual.mesSeleccionado;
+        }
+      } else if (filtro === 'anio') {
+        const rangoAnual = calcularRangoAnual(valorMes);
+        fechaInicio = rangoAnual.fechaInicio;
+        fechaFin = rangoAnual.fechaFin;
       }
 
       let query = supabase
         .from('VENTAS')
         .select('*, CLIENTE(nombre)')
-        .order('created_at', { ascending: false })
-        .gte('created_at', fechaInicio)
-        .lte('created_at', fechaFin);
+        .order('created_at', { ascending: false });
+
+      if (fechaInicio && fechaFin) {
+        query = query
+          .gte('created_at', fechaInicio)
+          .lte('created_at', fechaFin);
+      }
 
       const { data, error } = await query;
 
@@ -157,13 +187,13 @@
       document.getElementById("modal-detalle").classList.add('oculto');
     }
 
-    const inputMes = document.getElementById('mesFiltro');
-    if (inputMes) {
-      inputMes.value = obtenerMesActual();
-      inputMes.addEventListener('change', cargarVentas);
+    const inputMesSelector = document.getElementById('mesFiltro');
+    if (inputMesSelector) {
+      inputMesSelector.value = obtenerMesActual();
+      inputMesSelector.addEventListener('change', () => cargarVentas('mes'));
     }
 
-    cargarVentas();
+    cargarVentas('mes');
   </script>
 </body>
 </html>
