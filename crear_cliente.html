@@ -33,9 +33,12 @@
 
     <section class="listado-clientes">
       <h2>📋 Clientes registrados</h2>
-      <div id="lista-clientes" class="listado-clientes__lista">
-        <p>Cargando clientes...</p>
-      </div>
+      <select id="cliente-consulta" class="listado-clientes__select">
+        <option value="">Cargando clientes...</option>
+      </select>
+      <p class="listado-clientes__nota">
+        Esta lista desplegable es solo informativa; seleccionar un cliente no realiza ninguna acción.
+      </p>
     </section>
   </main>
 
@@ -49,61 +52,37 @@
     })();
 
     async function cargarClientes() {
-      const contenedor = document.getElementById('lista-clientes');
-      if (!contenedor) return;
+      const select = document.getElementById('cliente-consulta');
+      if (!select) return;
 
-      contenedor.innerHTML = '<p>Cargando clientes...</p>';
+      select.innerHTML = '<option value="">Cargando clientes...</option>';
+      select.disabled = true;
 
       const { data, error } = await supabase
         .from('CLIENTE')
-        .select('id, nombre, telefono, direccion, problemas')
+        .select('id, nombre')
         .order('nombre', { ascending: true });
 
       if (error) {
         console.error('Error al cargar clientes:', error);
-        contenedor.innerHTML = '<p>Error al cargar clientes.</p>';
+        select.innerHTML = '<option value="">Error al cargar clientes</option>';
         return;
       }
 
       if (!data || data.length === 0) {
-        contenedor.innerHTML = '<p>No hay clientes registrados.</p>';
+        select.innerHTML = '<option value="">No hay clientes registrados</option>';
         return;
       }
 
-      const lista = document.createElement('ul');
+      select.disabled = false;
+      select.innerHTML = '<option value="">Clientes registrados (solo consulta)</option>';
 
       data.forEach(cliente => {
-        const item = document.createElement('li');
-
-        const nombre = document.createElement('strong');
-        nombre.textContent = cliente.nombre;
-        item.appendChild(nombre);
-
-        const detalles = document.createElement('div');
-        detalles.className = 'listado-clientes__detalles';
-
-        const telefono = document.createElement('span');
-        telefono.textContent = `📞 ${cliente.telefono}`;
-        detalles.appendChild(telefono);
-
-        const direccion = document.createElement('span');
-        direccion.textContent = `📍 ${cliente.direccion}`;
-        detalles.appendChild(direccion);
-
-        item.appendChild(detalles);
-
-        if (cliente.problemas) {
-          const etiquetaProblemas = document.createElement('span');
-          etiquetaProblemas.className = 'listado-clientes__problemas';
-          etiquetaProblemas.textContent = '⚠️ Problemas';
-          item.appendChild(etiquetaProblemas);
-        }
-
-        lista.appendChild(item);
+        const option = document.createElement('option');
+        option.value = cliente.id;
+        option.textContent = cliente.nombre;
+        select.appendChild(option);
       });
-
-      contenedor.innerHTML = '';
-      contenedor.appendChild(lista);
     }
 
     async function crearCliente() {
