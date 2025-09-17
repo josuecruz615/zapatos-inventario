@@ -334,6 +334,41 @@ th {
   gap: 1rem;
 }
 
+.listado-clientes {
+  background-color: white;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  margin-top: 20px;
+  color: #000;
+}
+
+.listado-clientes h2 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+.listado-clientes__select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 1rem;
+  color: #000;
+  background-color: #fff;
+}
+
+.listado-clientes__select:disabled {
+  background-color: #f5f5f5;
+  color: #777;
+}
+
+.listado-clientes__nota {
+  margin-top: 12px;
+  font-size: 0.9rem;
+  color: #555;
+}
+
 .formulario input[type="text"],
 .formulario input[type="tel"],
 .formulario input[type="number"],

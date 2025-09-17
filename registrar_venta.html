@@ -79,7 +79,7 @@
       const { data, error } = await supabase
         .from('CLIENTE')
         .select('*')
-        .order('created_at', { ascending: false }); // 🔁 Orden por fecha de creación (desc)
+        .order('nombre', { ascending: true });
 
       if (error) return alert('Error cargando clientes');
       const select = document.getElementById('cliente-select');
