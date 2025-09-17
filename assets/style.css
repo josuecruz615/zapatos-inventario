@@ -334,6 +334,65 @@ th {
   gap: 1rem;
 }
 
+.listado-clientes {
+  background-color: white;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  margin-top: 20px;
+  color: #000;
+}
+
+.listado-clientes h2 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+.listado-clientes__lista ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.listado-clientes__lista li {
+  padding: 12px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.listado-clientes__lista li:last-child {
+  border-bottom: none;
+}
+
+.listado-clientes__lista strong {
+  display: block;
+  font-size: 1.1rem;
+}
+
+.listado-clientes__detalles {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+  color: #555;
+  font-size: 0.9rem;
+}
+
+.listado-clientes__problemas {
+  margin-top: 8px;
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background-color: rgba(255, 102, 102, 0.15);
+  color: #a40000;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.listado-clientes__lista p {
+  margin: 0;
+  color: #555;
+}
+
 .formulario input[type="text"],
 .formulario input[type="tel"],
 .formulario input[type="number"],

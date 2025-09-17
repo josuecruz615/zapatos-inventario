@@ -30,6 +30,13 @@
 
       <button onclick="crearCliente()">💾 Guardar Cliente</button>
     </div>
+
+    <section class="listado-clientes">
+      <h2>📋 Clientes registrados</h2>
+      <div id="lista-clientes" class="listado-clientes__lista">
+        <p>Cargando clientes...</p>
+      </div>
+    </section>
   </main>
 
   <div id="footer"></div>
@@ -38,7 +45,66 @@
     (async () => {
       document.getElementById("header").innerHTML = await fetch("header.html").then(r => r.text());
       document.getElementById("footer").innerHTML = await fetch("footer.html").then(r => r.text());
+      await cargarClientes();
     })();
+
+    async function cargarClientes() {
+      const contenedor = document.getElementById('lista-clientes');
+      if (!contenedor) return;
+
+      contenedor.innerHTML = '<p>Cargando clientes...</p>';
+
+      const { data, error } = await supabase
+        .from('CLIENTE')
+        .select('id, nombre, telefono, direccion, problemas')
+        .order('nombre', { ascending: true });
+
+      if (error) {
+        console.error('Error al cargar clientes:', error);
+        contenedor.innerHTML = '<p>Error al cargar clientes.</p>';
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        contenedor.innerHTML = '<p>No hay clientes registrados.</p>';
+        return;
+      }
+
+      const lista = document.createElement('ul');
+
+      data.forEach(cliente => {
+        const item = document.createElement('li');
+
+        const nombre = document.createElement('strong');
+        nombre.textContent = cliente.nombre;
+        item.appendChild(nombre);
+
+        const detalles = document.createElement('div');
+        detalles.className = 'listado-clientes__detalles';
+
+        const telefono = document.createElement('span');
+        telefono.textContent = `📞 ${cliente.telefono}`;
+        detalles.appendChild(telefono);
+
+        const direccion = document.createElement('span');
+        direccion.textContent = `📍 ${cliente.direccion}`;
+        detalles.appendChild(direccion);
+
+        item.appendChild(detalles);
+
+        if (cliente.problemas) {
+          const etiquetaProblemas = document.createElement('span');
+          etiquetaProblemas.className = 'listado-clientes__problemas';
+          etiquetaProblemas.textContent = '⚠️ Problemas';
+          item.appendChild(etiquetaProblemas);
+        }
+
+        lista.appendChild(item);
+      });
+
+      contenedor.innerHTML = '';
+      contenedor.appendChild(lista);
+    }
 
     async function crearCliente() {
       const nombre = document.getElementById('nombre').value.trim();
