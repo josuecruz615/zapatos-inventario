@@ -86,6 +86,32 @@ button:hover,
   color: #000;
 }
 
+.venta-opciones {
+  margin: 16px 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.venta-opciones .campo-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 180px;
+}
+
+.venta-opciones label {
+  font-weight: 600;
+}
+
+.venta-opciones input {
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background-color: #fff;
+  color: #000;
+}
+
 /* ===== Footer ===== */
 footer {
   text-align: center;
