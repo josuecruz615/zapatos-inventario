@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', async () => {
-  if (!window.portalAuth) {
+  if (!window.portalAuth || typeof supabase === 'undefined') {
     console.error('El módulo de autenticación no está disponible.');
     return;
   }
@@ -10,11 +10,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   const form = document.getElementById('login-form');
-  const codeInput = document.getElementById('verification-code');
+  const emailInput = document.getElementById('login-email');
+  const passwordInput = document.getElementById('login-password');
   const feedback = document.getElementById('login-feedback');
   const submitButton = document.getElementById('login-submit');
 
-  if (!form || !codeInput || !feedback || !submitButton) {
+  if (!form || !emailInput || !passwordInput || !feedback || !submitButton) {
     console.error('Faltan elementos requeridos en la pantalla de acceso.');
     return;
   }
@@ -27,19 +28,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   };
 
-  codeInput.addEventListener('input', () => {
+  const clearFeedbackIfNeeded = () => {
     if (feedback.textContent) {
       setFeedback('');
     }
-  });
+  };
+
+  emailInput.addEventListener('input', clearFeedbackIfNeeded);
+  passwordInput.addEventListener('input', clearFeedbackIfNeeded);
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const code = codeInput.value.trim();
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
 
-    if (!code) {
-      setFeedback('Ingresa el código de verificación proporcionado.', 'error');
-      codeInput.focus();
+    if (!email || !password) {
+      setFeedback('Ingresa tu correo y contraseña para continuar.', 'error');
+      if (!email) {
+        emailInput.focus();
+      } else {
+        passwordInput.focus();
+      }
       return;
     }
 
@@ -48,24 +57,31 @@ document.addEventListener('DOMContentLoaded', async () => {
     submitButton.textContent = 'Validando...';
 
     try {
-      const result = await portalAuth.iniciarSesionConCodigo(code);
-      if (result.ok) {
-        setFeedback('Acceso concedido. Redirigiendo...', 'success');
-        const destino = portalAuth.obtenerDestinoSeguro();
-        setTimeout(() => {
-          window.location.replace(destino);
-        }, 400);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (error) {
+        const message = error.message || 'No se pudo iniciar sesión. Verifica tus credenciales.';
+        setFeedback(message, 'error');
         return;
       }
 
-      if (result.reason === 'invalid') {
-        setFeedback('El código no es válido o está inactivo.', 'error');
-      } else {
-        setFeedback('No se pudo validar el código. Intenta nuevamente.', 'error');
+      if (!data || !data.session) {
+        setFeedback('Tu cuenta requiere confirmación antes de iniciar sesión. Revisa tu correo.', 'info');
+        return;
       }
+
+      portalAuth.refrescarIndicadoresSesion(data.session);
+      setFeedback('Acceso concedido. Redirigiendo...', 'success');
+      const destino = portalAuth.obtenerDestinoSeguro();
+      setTimeout(() => {
+        window.location.replace(destino);
+      }, 400);
     } catch (error) {
-      console.error('Error al iniciar sesión con código', error);
-      setFeedback('Ocurrió un error al validar el código. Vuelve a intentarlo.', 'error');
+      console.error('Error al iniciar sesión con Supabase Auth', error);
+      setFeedback('Ocurrió un error al validar tus credenciales. Intenta nuevamente.', 'error');
     } finally {
       submitButton.disabled = false;
       submitButton.textContent = originalText;

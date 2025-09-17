@@ -13,15 +13,19 @@
     <div class="login-card">
       <h1>Acceso al portal</h1>
       <p class="login-description">
-        Ingresa el código de verificación proporcionado para acceder a las herramientas internas.
+        Usa tus credenciales de Supabase Auth para ingresar a las herramientas internas.
       </p>
-      <form id="login-form" autocomplete="one-time-code">
-        <label for="verification-code">Código de verificación</label>
-        <input type="password" id="verification-code" placeholder="Ej. ZAPATO-2024" required autofocus />
-        <button type="submit" id="login-submit">Ingresar</button>
+      <form id="login-form" autocomplete="on">
+        <label for="login-email">Correo electrónico</label>
+        <input type="email" id="login-email" name="email" placeholder="tucorreo@empresa.com" autocomplete="email" required autofocus />
+
+        <label for="login-password">Contraseña</label>
+        <input type="password" id="login-password" name="password" placeholder="Ingresa tu contraseña" autocomplete="current-password" required />
+
+        <button type="submit" id="login-submit">Iniciar sesión</button>
       </form>
       <p id="login-feedback" class="login-feedback" role="alert"></p>
-      <p class="login-help">¿No tienes código? Contacta al administrador para generar uno nuevo y registrarlo en la tabla <strong>CODIGOS_ACCESO</strong>.</p>
+      <p class="login-help">¿Necesitas acceso? Contacta al administrador para crear o habilitar tu cuenta en Supabase Auth.</p>
     </div>
   </div>
   <script src="js/login.js"></script>
