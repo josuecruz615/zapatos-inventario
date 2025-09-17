@@ -1,7 +1,21 @@
 (() => {
-  const STORAGE_KEY = 'portalSesionVerificada';
-  const SESSION_DURATION_MS = 12 * 60 * 60 * 1000; // 12 horas
-  const REVALIDATION_INTERVAL_MS = 5 * 60 * 1000; // 5 minutos
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  if (typeof supabase === 'undefined') {
+    console.error('Supabase no está disponible. Verifica la carga de supabase-client.js.');
+    window.portalAuth = {
+      asegurarSesionActiva: async () => false,
+      cerrarSesion: async () => {},
+      refrescarIndicadoresSesion: () => {},
+      obtenerSesionActual: async () => null,
+      obtenerDestinoSeguro: () => 'inventario.html'
+    };
+    return;
+  }
+
+  let lastKnownSession = null;
 
   const getCurrentFile = () => {
     const parts = window.location.pathname.split('/');
@@ -35,39 +49,36 @@
     }
   };
 
-  const readSessionWithoutValidation = () => {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-
-    try {
-      return JSON.parse(raw);
-    } catch (error) {
-      console.warn('Sesión inválida en almacenamiento local, limpiando.', error);
-      localStorage.removeItem(STORAGE_KEY);
-      return null;
-    }
+  const getSafeDestination = () => {
+    const params = new URLSearchParams(window.location.search);
+    const nextParam = params.get('next');
+    return sanitizeDestination(nextParam);
   };
 
-  const persistSession = (session) => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
-    refreshSessionIndicators(session);
+  const redirectToLogin = () => {
+    if (isLoginPage()) return;
+    const nextValue = buildNextParam();
+    window.location.replace(`login.html?next=${nextValue}`);
   };
 
-  const clearSession = () => {
-    localStorage.removeItem(STORAGE_KEY);
-    refreshSessionIndicators(null);
+  const extractAlias = (session) => {
+    if (!session || !session.user) return '';
+    const { user } = session;
+    return user.email || user.user_metadata?.full_name || user.user_metadata?.name || 'Usuario autenticado';
   };
 
   const refreshSessionIndicators = (sessionParam) => {
-    const session = sessionParam || readSessionWithoutValidation();
+    if (sessionParam !== undefined) {
+      lastKnownSession = sessionParam;
+    }
+
+    const session = sessionParam !== undefined ? sessionParam : lastKnownSession;
     const aliasElement = document.getElementById('session-user-alias');
     const logoutButton = document.querySelector('[data-logout]');
 
     if (aliasElement) {
-      if (session && session.alias) {
-        aliasElement.textContent = `🔐 ${session.alias}`;
-      } else if (session) {
-        aliasElement.textContent = '🔐 Acceso activo';
+      if (session) {
+        aliasElement.textContent = `🔐 ${extractAlias(session)}`;
       } else {
         aliasElement.textContent = '';
       }
@@ -78,141 +89,72 @@
     }
   };
 
-  const hashVerificationCode = async (code) => {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(code);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  };
-
-  const fetchCodeRecord = async (hash) => {
-    // Espera que exista la función RPC validar_codigo_acceso(hash text)
-    // que devuelve la fila activa coincidente con el hash proporcionado.
-    const { data, error } = await supabase.rpc('validar_codigo_acceso', { p_hash: hash });
-
+  const getCurrentSession = async () => {
+    const { data, error } = await supabase.auth.getSession();
     if (error) {
       throw error;
     }
-
-    if (!data) {
-      return null;
-    }
-
-    if (Array.isArray(data)) {
-      return data[0] || null;
-    }
-
-    return data;
-  };
-
-  const obtainCurrentSession = async ({ revalidate = true } = {}) => {
-    const stored = readSessionWithoutValidation();
-    if (!stored || !stored.token || !stored.expira) {
-      clearSession();
-      return null;
-    }
-
-    if (Date.now() > stored.expira) {
-      clearSession();
-      return null;
-    }
-
-    if (!revalidate) {
-      return stored;
-    }
-
-    const lastValidation = stored.ultimaValidacion || 0;
-    if (Date.now() - lastValidation < REVALIDATION_INTERVAL_MS) {
-      return stored;
-    }
-
-    const record = await fetchCodeRecord(stored.token);
-    if (!record) {
-      clearSession();
-      return null;
-    }
-
-    const refreshed = {
-      token: stored.token,
-      alias: record.alias || stored.alias || '',
-      expira: Date.now() + SESSION_DURATION_MS,
-      ultimaValidacion: Date.now()
-    };
-    persistSession(refreshed);
-    return refreshed;
+    const session = data?.session || null;
+    lastKnownSession = session;
+    return session;
   };
 
   const ensureActiveSession = async () => {
-    if (typeof supabase === 'undefined') {
-      console.error('Supabase no está disponible. Verifica la carga de supabase-client.js.');
+    let session = null;
+
+    try {
+      session = await getCurrentSession();
+    } catch (error) {
+      console.error('No se pudo obtener la sesión actual', error);
+      if (!isLoginPage()) {
+        alert('No se pudo validar tu sesión. Por favor ingresa nuevamente.');
+        redirectToLogin();
+      }
       return false;
     }
 
     if (isLoginPage()) {
-      const existing = await obtainCurrentSession({ revalidate: false });
-      if (existing) {
+      if (session) {
+        refreshSessionIndicators(session);
         const destination = getSafeDestination();
         window.location.replace(destination);
         return false;
       }
+
+      refreshSessionIndicators(null);
       return true;
     }
 
-    try {
-      const session = await obtainCurrentSession();
-      if (!session) {
-        redirectToLogin();
-        return false;
-      }
-      refreshSessionIndicators(session);
-      return session;
-    } catch (error) {
-      console.error('No se pudo validar la sesión activa', error);
-      alert('No se pudo validar tu sesión. Por favor ingresa nuevamente.');
+    if (!session) {
       redirectToLogin();
       return false;
     }
+
+    refreshSessionIndicators(session);
+    return session;
   };
 
-  const startSessionWithCode = async (code) => {
-    const hash = await hashVerificationCode(code);
-    const record = await fetchCodeRecord(hash);
-
-    if (!record) {
-      return { ok: false, reason: 'invalid' };
+  const logout = async (redirect = true) => {
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error('Error al cerrar la sesión de Supabase', error);
     }
 
-    const session = {
-      token: hash,
-      alias: record.alias || '',
-      expira: Date.now() + SESSION_DURATION_MS,
-      ultimaValidacion: Date.now()
-    };
+    refreshSessionIndicators(null);
 
-    persistSession(session);
-    return { ok: true, session };
-  };
-
-  const getSafeDestination = () => {
-    const params = new URLSearchParams(window.location.search);
-    const nextParam = params.get('next');
-    const safePath = sanitizeDestination(nextParam);
-    return safePath;
-  };
-
-  const redirectToLogin = () => {
-    if (isLoginPage()) return;
-    const nextValue = buildNextParam();
-    window.location.replace(`login.html?next=${nextValue}`);
-  };
-
-  const logout = (redirect = true) => {
-    clearSession();
     if (redirect) {
       window.location.replace('login.html');
     }
   };
+
+  supabase.auth.onAuthStateChange((_event, session) => {
+    lastKnownSession = session;
+    refreshSessionIndicators(session);
+    if (!session && !isLoginPage()) {
+      redirectToLogin();
+    }
+  });
 
   document.addEventListener('click', (event) => {
     if (event.target.matches('[data-logout]')) {
@@ -227,10 +169,16 @@
 
   window.portalAuth = {
     asegurarSesionActiva: ensureActiveSession,
-    iniciarSesionConCodigo: startSessionWithCode,
     cerrarSesion: logout,
     refrescarIndicadoresSesion: refreshSessionIndicators,
-    obtenerSesionActual: obtainCurrentSession,
+    obtenerSesionActual: async () => {
+      try {
+        return await getCurrentSession();
+      } catch (error) {
+        console.error('No se pudo obtener la sesión actual', error);
+        return null;
+      }
+    },
     obtenerDestinoSeguro: getSafeDestination
   };
 })();
