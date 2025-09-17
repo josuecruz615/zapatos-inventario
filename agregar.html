@@ -6,9 +6,8 @@
   <link rel="stylesheet" href="assets/style.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
   <script src="js/supabase-client.js"></script>
+  <script src="js/auth.js"></script>
 </head>
-<body>
-
 <body>
 
 <div id="header"></div>
@@ -44,9 +43,13 @@
 
 <script>
 (async () => {
+  const sesion = await portalAuth.asegurarSesionActiva();
+  if (!sesion) return;
+
   try {
     const header = await fetch('header.html').then(r => r.text());
     document.getElementById("header").innerHTML = header;
+    portalAuth.refrescarIndicadoresSesion();
     const footer = await fetch('footer.html').then(r => r.text());
     document.getElementById("footer").innerHTML = footer;
     generarTallasPorDefecto();
