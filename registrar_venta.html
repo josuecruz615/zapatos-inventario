@@ -52,12 +52,17 @@
     <tbody></tbody>
   </table>
 
-  <p id="total-carrito">Total: Q 0.00</p>
+  <p id="total-carrito">Total productos: Q 0.00</p>
 
-  <!-- Campo de ajuste debajo del total -->
-  <div style="margin-top: 1em;">
-    <label for="ajuste">🧾 Descuento o Recargo (Q):</label>
-    <input type="number" id="ajuste" value="0" step="5">
+  <div class="venta-opciones">
+    <div class="campo-form">
+      <label for="fecha-venta">🗓️ Fecha de la venta:</label>
+      <input type="date" id="fecha-venta">
+    </div>
+    <div class="campo-form">
+      <label for="total-final">💳 Total final (Q):</label>
+      <input type="number" id="total-final" min="0" step="0.01">
+    </div>
   </div>
 
   <button onclick="registrarVenta()">✅ Registrar Venta</button>
@@ -67,6 +72,32 @@
   <script>
     let productos = [];
     let seleccionados = [];
+    let totalFinalManual = false;
+    let totalBaseActual = 0;
+
+    const totalFinalInput = document.getElementById('total-final');
+    const fechaVentaInput = document.getElementById('fecha-venta');
+
+    if (fechaVentaInput) {
+      const hoy = new Date();
+      const anio = hoy.getFullYear();
+      const mes = String(hoy.getMonth() + 1).padStart(2, '0');
+      const dia = String(hoy.getDate()).padStart(2, '0');
+      fechaVentaInput.value = `${anio}-${mes}-${dia}`;
+    }
+
+    if (totalFinalInput) {
+      totalFinalInput.value = '0.00';
+      totalFinalInput.addEventListener('input', () => {
+        totalFinalManual = totalFinalInput.value.trim() !== '';
+      });
+      totalFinalInput.addEventListener('blur', () => {
+        if (totalFinalInput.value.trim() === '') {
+          totalFinalManual = false;
+          totalFinalInput.value = totalBaseActual.toFixed(2);
+        }
+      });
+    }
 
     (async () => {
       document.getElementById("header").innerHTML = await fetch('header.html').then(r => r.text());
@@ -79,7 +110,7 @@
       const { data, error } = await supabase
         .from('CLIENTE')
         .select('*')
-        .order('created_at', { ascending: false }); // 🔁 Orden por fecha de creación (desc)
+        .order('nombre', { ascending: true });
 
       if (error) return alert('Error cargando clientes');
       const select = document.getElementById('cliente-select');
@@ -225,7 +256,22 @@
         tbody.appendChild(fila);
       });
 
-      document.getElementById('total-carrito').textContent = `Total: Q ${total.toFixed(2)}`;
+      const totalRedondeado = Number(total.toFixed(2));
+      totalBaseActual = totalRedondeado;
+      document.getElementById('total-carrito').textContent = `Total productos: Q ${totalRedondeado.toFixed(2)}`;
+
+      if (!totalFinalInput) return;
+
+      if (seleccionados.length === 0) {
+        totalFinalManual = false;
+        totalBaseActual = 0;
+        totalFinalInput.value = '0.00';
+        return;
+      }
+
+      if (!totalFinalManual) {
+        totalFinalInput.value = totalRedondeado.toFixed(2);
+      }
     }
 
     function quitarDelCarrito(index) {
@@ -238,13 +284,40 @@
       if (!clienteId) return alert('Selecciona un cliente');
       if (seleccionados.length === 0) return alert('No se agregaron productos');
 
-      const totalBase = seleccionados.reduce((s, d) => s + d.subtotal, 0);
-      const ajuste = parseFloat(document.getElementById('ajuste').value) || 0;
-      const total = totalBase + ajuste;
+      const totalBase = Number(seleccionados.reduce((s, d) => s + d.subtotal, 0).toFixed(2));
+
+      if (!totalFinalInput) return alert('No se encontró el campo de total final');
+
+      const totalFinal = Number(totalFinalInput.value);
+      if (!Number.isFinite(totalFinal) || totalFinal <= 0) {
+        return alert('Ingresa un total final válido');
+      }
+
+      const totalFinalRedondeado = Number(totalFinal.toFixed(2));
+      const ajuste = Number((totalFinalRedondeado - totalBase).toFixed(2));
+
+      if (!fechaVentaInput) return alert('No se encontró el campo de fecha');
+      const fechaSeleccionada = fechaVentaInput.value;
+      if (!fechaSeleccionada) {
+        return alert('Selecciona la fecha de la venta');
+      }
+
+      const partesFecha = fechaSeleccionada.split('-').map(Number);
+      if (partesFecha.length !== 3 || partesFecha.some(n => !Number.isFinite(n))) {
+        return alert('Fecha de venta inválida');
+      }
+
+      const [anio, mes, dia] = partesFecha;
+      if (!anio || !mes || !dia) {
+        return alert('Fecha de venta inválida');
+      }
+      const ahora = new Date();
+      const fechaVenta = new Date(anio, mes - 1, dia, ahora.getHours(), ahora.getMinutes(), ahora.getSeconds(), ahora.getMilliseconds());
+      const fechaVentaIso = fechaVenta.toISOString();
 
       const { data: venta, error: errorVenta } = await supabase
         .from('VENTAS')
-        .insert([{ cliente_id: clienteId, total: 0, ajuste }])
+        .insert([{ cliente_id: clienteId, total: totalFinalRedondeado, ajuste, created_at: fechaVentaIso }])
         .select()
         .single();
 
@@ -272,7 +345,7 @@
         }).eq('id', d.productoId);
       }
 
-      await supabase.from('VENTAS').update({ total }).eq('id', venta.id);
+      await supabase.from('VENTAS').update({ total: totalFinalRedondeado, ajuste }).eq('id', venta.id);
       alert('Venta registrada con éxito');
       location.reload();
     }
