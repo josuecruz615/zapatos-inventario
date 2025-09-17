@@ -87,19 +87,23 @@
   };
 
   const fetchCodeRecord = async (hash) => {
-    // Espera que la tabla CODIGOS_ACCESO tenga las columnas: hash (SHA-256 en hex), alias (opcional) y activo (boolean).
-    const { data, error } = await supabase
-      .from('CODIGOS_ACCESO')
-      .select('id, alias')
-      .eq('hash', hash)
-      .eq('activo', true)
-      .maybeSingle();
+    // Espera que exista la función RPC validar_codigo_acceso(hash text)
+    // que devuelve la fila activa coincidente con el hash proporcionado.
+    const { data, error } = await supabase.rpc('validar_codigo_acceso', { p_hash: hash });
 
-    if (error && error.code !== 'PGRST116') {
+    if (error) {
       throw error;
     }
 
-    return data || null;
+    if (!data) {
+      return null;
+    }
+
+    if (Array.isArray(data)) {
+      return data[0] || null;
+    }
+
+    return data;
   };
 
   const obtainCurrentSession = async ({ revalidate = true } = {}) => {
