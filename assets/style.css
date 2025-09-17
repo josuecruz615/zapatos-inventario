@@ -8,8 +8,105 @@ body {
   color: #000;
 }
 
+body.login-page {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at top, #ffffff 0%, #f3f4f6 45%, #e5e7eb 100%);
+}
+
 h1 {
   margin-bottom: 20px;
+}
+
+.login-wrapper {
+  width: 100%;
+  padding: 40px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 420px;
+  padding: 40px 32px;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  text-align: center;
+}
+
+.login-card h1 {
+  margin-bottom: 0;
+  font-size: 2rem;
+  color: #111827;
+}
+
+.login-description {
+  color: #4b5563;
+  font-size: 1rem;
+  margin: 0;
+}
+
+.login-card form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+}
+
+.login-card label {
+  font-weight: 600;
+  color: #111827;
+}
+
+.login-card input {
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.login-card input:focus {
+  border-color: #111827;
+  box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.15);
+  outline: none;
+}
+
+.login-card button {
+  width: 100%;
+  padding: 12px;
+  font-size: 1rem;
+  font-weight: 700;
+  border-radius: 8px;
+}
+
+.login-feedback {
+  min-height: 24px;
+  font-size: 0.95rem;
+}
+
+.login-feedback.error {
+  color: #b91c1c;
+}
+
+.login-feedback.success {
+  color: #15803d;
+}
+
+.login-help {
+  font-size: 0.9rem;
+  color: #6b7280;
+  margin: 0;
 }
 
 /* ===== Botones globales ===== */
@@ -83,6 +180,32 @@ button:hover,
 #contador-resultados {
   margin-bottom: 20px;
   font-weight: bold;
+  color: #000;
+}
+
+.venta-opciones {
+  margin: 16px 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.venta-opciones .campo-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 180px;
+}
+
+.venta-opciones label {
+  font-weight: 600;
+}
+
+.venta-opciones input {
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background-color: #fff;
   color: #000;
 }
 
@@ -245,10 +368,18 @@ th {
   margin-bottom: 20px;
 }
 
-.nav-menu {
+.header-content {
   max-width: 1200px;
-  margin: auto;
+  margin: 0 auto;
   padding: 0 20px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.nav-menu {
+  flex: 1;
 }
 
 .nav-list,
@@ -263,6 +394,49 @@ th {
   display: flex;
   justify-content: flex-start;
   gap: 30px;
+}
+
+.session-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #fff;
+  font-size: 0.95rem;
+  margin-left: auto;
+}
+
+.session-alias {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.logout-button {
+  display: none;
+  background: #dc2626;
+  border: none;
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.logout-button:hover {
+  background: #b91c1c;
+}
+
+@media (max-width: 768px) {
+  .nav-list {
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .session-info {
+    width: 100%;
+    justify-content: space-between;
+    margin-left: 0;
+  }
 }
 
 .nav-item {
@@ -332,6 +506,41 @@ th {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+
+.listado-clientes {
+  background-color: white;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  margin-top: 20px;
+  color: #000;
+}
+
+.listado-clientes h2 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+.listado-clientes__select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 1rem;
+  color: #000;
+  background-color: #fff;
+}
+
+.listado-clientes__select:disabled {
+  background-color: #f5f5f5;
+  color: #777;
+}
+
+.listado-clientes__nota {
+  margin-top: 12px;
+  font-size: 0.9rem;
+  color: #555;
 }
 
 .formulario input[type="text"],

@@ -1,11 +1,30 @@
-<!-- index.html -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta http-equiv="refresh" content="0; url=inventario.html" />
+  <meta charset="UTF-8" />
   <title>Redirigiendo...</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/auth.js"></script>
 </head>
 <body>
-  Si no redirige automáticamente, <a href="inventario.html">haz clic aquí</a>.
+  <p>Redirigiendo…</p>
+  <script>
+    (async () => {
+      if (!window.portalAuth) {
+        window.location.replace('login.html');
+        return;
+      }
+
+      try {
+        const sesion = await portalAuth.obtenerSesionActual({ revalidate: false });
+        const destino = sesion ? 'inventario.html' : 'login.html';
+        window.location.replace(destino);
+      } catch (error) {
+        console.error('No fue posible determinar la sesión activa', error);
+        window.location.replace('login.html');
+      }
+    })();
+  </script>
 </body>
 </html>

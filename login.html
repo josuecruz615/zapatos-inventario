@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Acceso seguro - ZAPATONGT</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/auth.js"></script>
+</head>
+<body class="login-page">
+  <div class="login-wrapper">
+    <div class="login-card">
+      <h1>Acceso al portal</h1>
+      <p class="login-description">
+        Ingresa el código de verificación proporcionado para acceder a las herramientas internas.
+      </p>
+      <form id="login-form" autocomplete="one-time-code">
+        <label for="verification-code">Código de verificación</label>
+        <input type="password" id="verification-code" placeholder="Ej. ZAPATO-2024" required autofocus />
+        <button type="submit" id="login-submit">Ingresar</button>
+      </form>
+      <p id="login-feedback" class="login-feedback" role="alert"></p>
+      <p class="login-help">¿No tienes código? Contacta al administrador para generar uno nuevo y registrarlo en la tabla <strong>CODIGOS_ACCESO</strong>.</p>
+    </div>
+  </div>
+  <script src="js/login.js"></script>
+</body>
+</html>
