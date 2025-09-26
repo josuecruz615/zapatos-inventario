@@ -283,14 +283,32 @@
     }
 
     async function descargarPDF() {
-      const totalProductos = Object.keys(ultimoInventarioAgrupado).length;
-      if (totalProductos === 0) {
+      const { jsPDF } = window.jspdf || {};
+      if (!jsPDF) {
+        alert('No se pudo cargar la librería para generar el PDF.');
+        return;
+      }
+
+      const codigos = Object.keys(ultimoInventarioAgrupado);
+      if (codigos.length === 0) {
         alert('No hay productos para exportar. Usa "Buscar" para aplicar filtros.');
         return;
       }
 
-      if (!window.jspdf || !window.jspdf.jsPDF) {
-        alert('No se pudo cargar la librería para generar el PDF.');
+      const tallaFiltro = document.getElementById('filtroTalla').value.trim();
+
+      const productosFiltrados = codigos
+        .map(codigo => {
+          const items = [...ultimoInventarioAgrupado[codigo]]
+            .filter(item => item.disponible > 0);
+          if (items.length === 0) return null;
+          items.sort((a, b) => parseFloat(a.talla) - parseFloat(b.talla));
+          return { codigo, producto: items[0] };
+        })
+        .filter(Boolean);
+
+      if (productosFiltrados.length === 0) {
+        alert('Ninguno de los productos filtrados está disponible para exportar.');
         return;
       }
 
@@ -302,76 +320,116 @@
       texto.textContent = 'Preparando PDF...';
       barra.style.width = '0%';
 
-      const { jsPDF } = window.jspdf;
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-
       const fechaActual = new Date();
       const fechaHora = fechaActual.toISOString().replace(/[-:]/g, '').replace(/\..+/, '').replace('T', '-');
 
-      const codigos = Object.keys(ultimoInventarioAgrupado);
+      const productosPorPagina = 2;
+      const margenSuperior = 20;
+      const separacionVertical = 140;
+      const anchoPagina = pdf.internal.pageSize.getWidth();
+      const maxAnchoImagen = anchoPagina - 40;
+      const maxAltoImagen = 110;
 
-      for (let index = 0; index < codigos.length; index++) {
-        const codigo = codigos[index];
-        const items = [...ultimoInventarioAgrupado[codigo]];
-
-        if (index !== 0) {
+      for (let index = 0; index < productosFiltrados.length; index++) {
+        if (index > 0 && index % productosPorPagina === 0) {
           pdf.addPage();
         }
 
-        items.sort((a, b) => parseFloat(a.talla) - parseFloat(b.talla));
-        const producto = items[0];
+        const { producto } = productosFiltrados[index];
+        const posicionEnPagina = index % productosPorPagina;
+        const inicioY = margenSuperior + (posicionEnPagina * separacionVertical);
 
-        texto.textContent = `Generando PDF (${index + 1} de ${totalProductos})...`;
-        barra.style.width = `${((index + 1) / totalProductos) * 100}%`;
+        texto.textContent = `Generando PDF (${index + 1} de ${productosFiltrados.length})...`;
+        barra.style.width = `${((index + 1) / productosFiltrados.length) * 100}%`;
 
-        let imagenDataUrl = null;
-        let formatoImagen = 'JPEG';
-        try {
-          const respuesta = await fetch(producto.imagen_url);
-          const blob = await respuesta.blob();
-          formatoImagen = blob.type.includes('png') ? 'PNG' : 'JPEG';
-          imagenDataUrl = await new Promise((resolve, reject) => {
-            const lector = new FileReader();
-            lector.onload = () => resolve(lector.result);
-            lector.onerror = () => reject(new Error('No se pudo leer la imagen'));
-            lector.readAsDataURL(blob);
-          });
-        } catch (error) {
-          console.warn(`No se pudo cargar la imagen del producto ${codigo}`, error);
-        }
+        const imagenInfo = await cargarImagenParaPDF(producto.imagen_url);
 
         pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(18);
-        pdf.text(`${producto.nombre} - ${producto.codigo}`, 105, 25, { align: 'center' });
+        pdf.setFontSize(16);
+        pdf.text(producto.marca || '', anchoPagina / 2, inicioY, { align: 'center' });
 
-        pdf.setFontSize(12);
-        pdf.text(`Marca: ${producto.marca}`, 20, 40);
-        pdf.text(`Precio: Q ${producto.precio.toFixed(2)}`, 20, 48);
-
-        if (imagenDataUrl) {
-          pdf.addImage(imagenDataUrl, formatoImagen, 110, 35, 80, 80);
-        }
-
-        pdf.setFontSize(14);
-        pdf.text('Tallas disponibles', 20, 65);
-
-        pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(12);
-        let yActual = 75;
-        pdf.text('Talla', 20, yActual);
-        pdf.text('Disponible', 60, yActual);
         pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(14);
+        pdf.text(producto.nombre || '', anchoPagina / 2, inicioY + 8, { align: 'center' });
 
-        yActual += 8;
-        items.forEach(item => {
-          pdf.text(String(item.talla), 20, yActual);
-          pdf.text(String(item.disponible), 60, yActual);
-          yActual += 8;
-        });
+        let altoImagenUtilizado = maxAltoImagen;
+        if (imagenInfo && imagenInfo.dataUrl) {
+          let imagenAncho = maxAnchoImagen;
+          let imagenAlto = maxAltoImagen;
+          if (imagenInfo.width && imagenInfo.height) {
+            const escala = Math.min(maxAnchoImagen / imagenInfo.width, maxAltoImagen / imagenInfo.height);
+            imagenAncho = imagenInfo.width * escala;
+            imagenAlto = imagenInfo.height * escala;
+          }
+          altoImagenUtilizado = imagenAlto;
+          const posicionX = (anchoPagina - imagenAncho) / 2;
+          pdf.addImage(
+            imagenInfo.dataUrl,
+            imagenInfo.formato,
+            posicionX,
+            inicioY + 14,
+            imagenAncho,
+            imagenAlto
+          );
+        }
+
+        const tallaTexto = tallaFiltro || producto.talla;
+        const centimetros = obtenerCentimetrosDesdeTalla(tallaTexto);
+        const alturaTexto = inicioY + 14 + altoImagenUtilizado + 12;
+
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(15);
+        const textoTalla = centimetros
+          ? `Talla ${tallaTexto} (${centimetros} cm)`
+          : `Talla ${tallaTexto}`;
+        pdf.text(textoTalla.trim(), anchoPagina / 2, alturaTexto, { align: 'center' });
       }
 
       modal.style.display = 'none';
       pdf.save(`inventario_${fechaHora}.pdf`);
+    }
+
+    function obtenerCentimetrosDesdeTalla(tallaStr) {
+      if (!tallaStr) return '';
+      const normalizado = tallaStr.replace(',', '.');
+      const talla = parseFloat(normalizado);
+      if (Number.isNaN(talla)) return '';
+
+      if (talla <= 33) {
+        return talla.toFixed(1);
+      }
+
+      const centimetros = (talla + 10) / 1.5;
+      return centimetros.toFixed(1);
+    }
+
+    async function cargarImagenParaPDF(url) {
+      if (!url) return null;
+      try {
+        const respuesta = await fetch(url);
+        const blob = await respuesta.blob();
+        const formato = blob.type && blob.type.includes('png') ? 'PNG' : 'JPEG';
+
+        const dataUrl = await new Promise((resolve, reject) => {
+          const lector = new FileReader();
+          lector.onload = () => resolve(lector.result);
+          lector.onerror = () => reject(new Error('No se pudo leer la imagen'));
+          lector.readAsDataURL(blob);
+        });
+
+        const dimensiones = await new Promise(resolve => {
+          const imagen = new Image();
+          imagen.onload = () => resolve({ width: imagen.width, height: imagen.height });
+          imagen.onerror = () => resolve({ width: null, height: null });
+          imagen.src = dataUrl;
+        });
+
+        return { dataUrl, formato, ...dimensiones };
+      } catch (error) {
+        console.warn('No se pudo cargar la imagen para el PDF', error);
+        return null;
+      }
     }
   </script>
 </body>
