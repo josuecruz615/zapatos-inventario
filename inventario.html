@@ -7,6 +7,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
   <script src="js/supabase-client.js"></script>
   <script src="js/auth.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <link rel="stylesheet" href="assets/style.css">
   <style>
     #modal-progreso {
@@ -63,6 +64,7 @@
     <button onclick="cargarInventario()">Buscar</button>
     <button onclick="limpiarFiltros()">Limpiar</button>
     <button onclick="descargarImagenes()">Descargar Imágenes</button>
+    <button onclick="descargarPDF()">Descargar PDF</button>
   </div>
 
   <div id="modal-progreso">
@@ -79,6 +81,7 @@
 
   <script>
     let inventarioCompleto = [];
+    let ultimoInventarioAgrupado = {};
 
     (async () => {
       const sesion = await portalAuth.asegurarSesionActiva();
@@ -141,6 +144,10 @@
         if (!agrupado[item.codigo]) agrupado[item.codigo] = [];
         agrupado[item.codigo].push(item);
       });
+
+      ultimoInventarioAgrupado = Object.fromEntries(
+        Object.entries(agrupado).map(([codigo, items]) => [codigo, [...items]])
+      );
 
       const contenedor = document.getElementById('inventario-contenedor');
       contenedor.innerHTML = '';
@@ -273,6 +280,98 @@
 
       modal.style.display = 'none';
       alert('¡Descarga del ZIP iniciada!');
+    }
+
+    async function descargarPDF() {
+      const totalProductos = Object.keys(ultimoInventarioAgrupado).length;
+      if (totalProductos === 0) {
+        alert('No hay productos para exportar. Usa "Buscar" para aplicar filtros.');
+        return;
+      }
+
+      if (!window.jspdf || !window.jspdf.jsPDF) {
+        alert('No se pudo cargar la librería para generar el PDF.');
+        return;
+      }
+
+      const modal = document.getElementById('modal-progreso');
+      const texto = document.getElementById('texto-progreso');
+      const barra = document.getElementById('barra-progreso').firstElementChild;
+
+      modal.style.display = 'flex';
+      texto.textContent = 'Preparando PDF...';
+      barra.style.width = '0%';
+
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+      const fechaActual = new Date();
+      const fechaHora = fechaActual.toISOString().replace(/[-:]/g, '').replace(/\..+/, '').replace('T', '-');
+
+      const codigos = Object.keys(ultimoInventarioAgrupado);
+
+      for (let index = 0; index < codigos.length; index++) {
+        const codigo = codigos[index];
+        const items = [...ultimoInventarioAgrupado[codigo]];
+
+        if (index !== 0) {
+          pdf.addPage();
+        }
+
+        items.sort((a, b) => parseFloat(a.talla) - parseFloat(b.talla));
+        const producto = items[0];
+
+        texto.textContent = `Generando PDF (${index + 1} de ${totalProductos})...`;
+        barra.style.width = `${((index + 1) / totalProductos) * 100}%`;
+
+        let imagenDataUrl = null;
+        let formatoImagen = 'JPEG';
+        try {
+          const respuesta = await fetch(producto.imagen_url);
+          const blob = await respuesta.blob();
+          formatoImagen = blob.type.includes('png') ? 'PNG' : 'JPEG';
+          imagenDataUrl = await new Promise((resolve, reject) => {
+            const lector = new FileReader();
+            lector.onload = () => resolve(lector.result);
+            lector.onerror = () => reject(new Error('No se pudo leer la imagen'));
+            lector.readAsDataURL(blob);
+          });
+        } catch (error) {
+          console.warn(`No se pudo cargar la imagen del producto ${codigo}`, error);
+        }
+
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(18);
+        pdf.text(`${producto.nombre} - ${producto.codigo}`, 105, 25, { align: 'center' });
+
+        pdf.setFontSize(12);
+        pdf.text(`Marca: ${producto.marca}`, 20, 40);
+        pdf.text(`Precio: Q ${producto.precio.toFixed(2)}`, 20, 48);
+
+        if (imagenDataUrl) {
+          pdf.addImage(imagenDataUrl, formatoImagen, 110, 35, 80, 80);
+        }
+
+        pdf.setFontSize(14);
+        pdf.text('Tallas disponibles', 20, 65);
+
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(12);
+        let yActual = 75;
+        pdf.text('Talla', 20, yActual);
+        pdf.text('Disponible', 60, yActual);
+        pdf.setFont('helvetica', 'normal');
+
+        yActual += 8;
+        items.forEach(item => {
+          pdf.text(String(item.talla), 20, yActual);
+          pdf.text(String(item.disponible), 60, yActual);
+          yActual += 8;
+        });
+      }
+
+      modal.style.display = 'none';
+      pdf.save(`inventario_${fechaHora}.pdf`);
     }
   </script>
 </body>
