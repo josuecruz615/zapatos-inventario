@@ -320,16 +320,21 @@
       texto.textContent = 'Preparando PDF...';
       barra.style.width = '0%';
 
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [140, 216] });
       const fechaActual = new Date();
       const fechaHora = fechaActual.toISOString().replace(/[-:]/g, '').replace(/\..+/, '').replace('T', '-');
 
-      const productosPorPagina = 2;
-      const margenSuperior = 20;
-      const separacionVertical = 140;
+      const productosPorPagina = 1;
+      const margen = 12;
       const anchoPagina = pdf.internal.pageSize.getWidth();
-      const maxAnchoImagen = anchoPagina - 40;
-      const maxAltoImagen = 110;
+      const altoPagina = pdf.internal.pageSize.getHeight();
+      const anchoColumnaTexto = 55;
+      const separacionColumnas = 8;
+      const inicioTextoX = margen;
+      const inicioTextoY = margen + 12;
+      const inicioImagenX = inicioTextoX + anchoColumnaTexto + separacionColumnas;
+      const maxAnchoImagen = anchoPagina - inicioImagenX - margen;
+      const maxAltoImagen = altoPagina - (margen * 2);
 
       for (let index = 0; index < productosFiltrados.length; index++) {
         if (index > 0 && index % productosPorPagina === 0) {
@@ -337,23 +342,31 @@
         }
 
         const { producto } = productosFiltrados[index];
-        const posicionEnPagina = index % productosPorPagina;
-        const inicioY = margenSuperior + (posicionEnPagina * separacionVertical);
-
         texto.textContent = `Generando PDF (${index + 1} de ${productosFiltrados.length})...`;
         barra.style.width = `${((index + 1) / productosFiltrados.length) * 100}%`;
 
         const imagenInfo = await cargarImagenParaPDF(producto.imagen_url);
 
         pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(20);
+
+        const tallaTexto = tallaFiltro || producto.talla;
+        const centimetros = obtenerCentimetrosDesdeTalla(tallaTexto);
+        const tituloTalla = centimetros
+          ? `Talla ${tallaTexto} (${centimetros} cm)`
+          : `Talla ${tallaTexto}`;
+        pdf.text(tituloTalla.trim(), inicioTextoX, inicioTextoY, { align: 'left', maxWidth: anchoColumnaTexto });
+
+        pdf.setFont('helvetica', 'bold');
         pdf.setFontSize(16);
-        pdf.text(producto.marca || '', anchoPagina / 2, inicioY, { align: 'center' });
+        const marcaTextoY = inicioTextoY + 18;
+        pdf.text((producto.marca || '').toUpperCase(), inicioTextoX, marcaTextoY, { align: 'left', maxWidth: anchoColumnaTexto });
 
         pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(14);
-        pdf.text(producto.nombre || '', anchoPagina / 2, inicioY + 8, { align: 'center' });
+        pdf.setFontSize(13);
+        const modeloTextoY = marcaTextoY + 12;
+        pdf.text(producto.nombre || '', inicioTextoX, modeloTextoY, { align: 'left', maxWidth: anchoColumnaTexto });
 
-        let altoImagenUtilizado = maxAltoImagen;
         if (imagenInfo && imagenInfo.dataUrl) {
           let imagenAncho = maxAnchoImagen;
           let imagenAlto = maxAltoImagen;
@@ -362,28 +375,17 @@
             imagenAncho = imagenInfo.width * escala;
             imagenAlto = imagenInfo.height * escala;
           }
-          altoImagenUtilizado = imagenAlto;
-          const posicionX = (anchoPagina - imagenAncho) / 2;
+          const espacioVertical = maxAltoImagen;
+          const posicionY = margen + (espacioVertical - imagenAlto) / 2;
           pdf.addImage(
             imagenInfo.dataUrl,
             imagenInfo.formato,
-            posicionX,
-            inicioY + 14,
+            inicioImagenX,
+            posicionY,
             imagenAncho,
             imagenAlto
           );
         }
-
-        const tallaTexto = tallaFiltro || producto.talla;
-        const centimetros = obtenerCentimetrosDesdeTalla(tallaTexto);
-        const alturaTexto = inicioY + 14 + altoImagenUtilizado + 12;
-
-        pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(15);
-        const textoTalla = centimetros
-          ? `Talla ${tallaTexto} (${centimetros} cm)`
-          : `Talla ${tallaTexto}`;
-        pdf.text(textoTalla.trim(), anchoPagina / 2, alturaTexto, { align: 'center' });
       }
 
       modal.style.display = 'none';
