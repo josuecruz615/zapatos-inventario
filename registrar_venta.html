@@ -145,8 +145,8 @@
     function filtrarProductos() {
       const codigo = document.getElementById('filtroCodigo').value.trim().toLowerCase();
       const nombre = document.getElementById('filtroNombre').value.trim().toLowerCase();
-      const marcasSeleccionadas = Array.from(filtrosMarcaSeleccionadas).map(m => m.trim().toLowerCase()).filter(Boolean);
-      const tallasSeleccionadas = Array.from(filtrosTallaSeleccionadas).map(t => t.trim()).filter(Boolean);
+      const marcasSeleccionadas = Array.from(filtrosMarcaSeleccionadas).filter(Boolean);
+      const tallasSeleccionadas = Array.from(filtrosTallaSeleccionadas).filter(Boolean);
 
       let filtrados = productos;
       if (codigo) filtrados = filtrados.filter(p => p.codigo.toLowerCase().includes(codigo));
@@ -419,17 +419,25 @@
       contenedor.innerHTML = '';
 
       valores.forEach(valor => {
+        const valorTexto = valor != null ? String(valor) : '';
+        const claveNormalizada = tipo === 'marca'
+          ? valorTexto.trim().toLowerCase()
+          : valorTexto.trim();
+
+        if (!claveNormalizada) return;
+
         const boton = document.createElement('button');
         boton.type = 'button';
         boton.className = 'boton-filtro';
-        boton.dataset.valor = valor;
-        boton.textContent = valor;
+        boton.dataset.valor = valorTexto;
+        boton.dataset.clave = claveNormalizada;
+        boton.textContent = valorTexto;
         boton.addEventListener('click', () => {
           const conjunto = tipo === 'marca' ? filtrosMarcaSeleccionadas : filtrosTallaSeleccionadas;
-          if (conjunto.has(valor)) {
-            conjunto.delete(valor);
+          if (conjunto.has(claveNormalizada)) {
+            conjunto.delete(claveNormalizada);
           } else {
-            conjunto.add(valor);
+            conjunto.add(claveNormalizada);
           }
           actualizarBotones(containerId, conjunto);
           filtrarProductos();
@@ -445,9 +453,10 @@
       const contenedor = document.getElementById(containerId);
       if (!contenedor) return;
       contenedor.querySelectorAll('button').forEach(boton => {
+        const claveBoton = boton.dataset.clave ?? boton.dataset.valor ?? '';
         const activo = valoresSeleccionados instanceof Set
-          ? valoresSeleccionados.has(boton.dataset.valor)
-          : valoresSeleccionados === boton.dataset.valor;
+          ? valoresSeleccionados.has(claveBoton)
+          : valoresSeleccionados === claveBoton;
         boton.classList.toggle('activo', activo);
       });
     }
