@@ -127,6 +127,43 @@ button:hover,
   background-color: #333;
 }
 
+.filtro-botones {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filtro-botones span {
+  font-weight: 600;
+}
+
+.grupo-botones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.boton-filtro {
+  background-color: #e5e7eb;
+  color: #111827;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.9rem;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.boton-filtro:hover {
+  background-color: #d1d5db;
+}
+
+.boton-filtro.activo {
+  background-color: #111827;
+  color: #fff;
+  border-color: #111827;
+}
+
 /* ===== Filtros ===== */
 #filtros-container {
   background-color: #fff;
