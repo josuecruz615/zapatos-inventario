@@ -79,8 +79,8 @@
     let seleccionados = [];
     let totalFinalManual = false;
     let totalBaseActual = 0;
-    let filtroMarcaSeleccionada = '';
-    let filtroTallaSeleccionada = '';
+    const filtrosMarcaSeleccionadas = new Set();
+    const filtrosTallaSeleccionadas = new Set();
 
     const totalFinalInput = document.getElementById('total-final');
     const fechaVentaInput = document.getElementById('fecha-venta');
@@ -145,14 +145,24 @@
     function filtrarProductos() {
       const codigo = document.getElementById('filtroCodigo').value.trim().toLowerCase();
       const nombre = document.getElementById('filtroNombre').value.trim().toLowerCase();
-      const marca = filtroMarcaSeleccionada.trim().toLowerCase();
-      const talla = filtroTallaSeleccionada.trim();
+      const marcasSeleccionadas = Array.from(filtrosMarcaSeleccionadas).map(m => m.trim().toLowerCase()).filter(Boolean);
+      const tallasSeleccionadas = Array.from(filtrosTallaSeleccionadas).map(t => t.trim()).filter(Boolean);
 
       let filtrados = productos;
       if (codigo) filtrados = filtrados.filter(p => p.codigo.toLowerCase().includes(codigo));
       if (nombre) filtrados = filtrados.filter(p => p.nombre.toLowerCase().includes(nombre));
-      if (marca) filtrados = filtrados.filter(p => p.marca.toLowerCase().includes(marca));
-      if (talla) filtrados = filtrados.filter(p => p.talla == talla);
+      if (marcasSeleccionadas.length) {
+        filtrados = filtrados.filter(p => {
+          const marcaNormalizada = (p.marca ?? '').toString().trim().toLowerCase();
+          return marcasSeleccionadas.includes(marcaNormalizada);
+        });
+      }
+      if (tallasSeleccionadas.length) {
+        filtrados = filtrados.filter(p => {
+          const tallaNormalizada = String(p.talla ?? '').trim();
+          return tallasSeleccionadas.includes(tallaNormalizada);
+        });
+      }
 
       mostrarProductos(filtrados);
     }
@@ -365,10 +375,10 @@
       ['filtroCodigo', 'filtroNombre'].forEach(id => {
         document.getElementById(id).value = '';
       });
-      filtroMarcaSeleccionada = '';
-      filtroTallaSeleccionada = '';
-      actualizarBotones('marcas-botones', filtroMarcaSeleccionada);
-      actualizarBotones('tallas-botones', filtroTallaSeleccionada);
+      filtrosMarcaSeleccionadas.clear();
+      filtrosTallaSeleccionadas.clear();
+      actualizarBotones('marcas-botones', filtrosMarcaSeleccionadas);
+      actualizarBotones('tallas-botones', filtrosTallaSeleccionadas);
       filtrarProductos();
     }
 
@@ -415,27 +425,29 @@
         boton.dataset.valor = valor;
         boton.textContent = valor;
         boton.addEventListener('click', () => {
-          if (tipo === 'marca') {
-            filtroMarcaSeleccionada = filtroMarcaSeleccionada === valor ? '' : valor;
-            actualizarBotones(containerId, filtroMarcaSeleccionada);
+          const conjunto = tipo === 'marca' ? filtrosMarcaSeleccionadas : filtrosTallaSeleccionadas;
+          if (conjunto.has(valor)) {
+            conjunto.delete(valor);
           } else {
-            filtroTallaSeleccionada = filtroTallaSeleccionada === valor ? '' : valor;
-            actualizarBotones(containerId, filtroTallaSeleccionada);
+            conjunto.add(valor);
           }
+          actualizarBotones(containerId, conjunto);
           filtrarProductos();
         });
         contenedor.appendChild(boton);
       });
 
-      const valorInicial = tipo === 'marca' ? filtroMarcaSeleccionada : filtroTallaSeleccionada;
-      actualizarBotones(containerId, valorInicial);
+      const conjunto = tipo === 'marca' ? filtrosMarcaSeleccionadas : filtrosTallaSeleccionadas;
+      actualizarBotones(containerId, conjunto);
     }
 
-    function actualizarBotones(containerId, valorSeleccionado) {
+    function actualizarBotones(containerId, valoresSeleccionados) {
       const contenedor = document.getElementById(containerId);
       if (!contenedor) return;
       contenedor.querySelectorAll('button').forEach(boton => {
-        const activo = valorSeleccionado !== '' && boton.dataset.valor === valorSeleccionado;
+        const activo = valoresSeleccionados instanceof Set
+          ? valoresSeleccionados.has(boton.dataset.valor)
+          : valoresSeleccionados === boton.dataset.valor;
         boton.classList.toggle('activo', activo);
       });
     }
