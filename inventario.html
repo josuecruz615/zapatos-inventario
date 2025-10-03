@@ -49,6 +49,8 @@
     <input list="nombres" type="text" id="filtroNombre" placeholder="👟 Nombre">
     <datalist id="nombres"></datalist>
 
+    <input type="number" id="filtroCantidad" min="0" step="1" placeholder="🔢 Cantidad total">
+
     <div class="filtro-botones">
       <span>🏷️ Marca:</span>
       <div id="marcas-botones" class="grupo-botones"></div>
@@ -132,6 +134,7 @@
       const marcasSeleccionadas = Array.from(filtrosMarcaSeleccionadas);
       const tallasSeleccionadas = Array.from(filtrosTallaSeleccionadas);
       const disponibleFiltro = document.getElementById('filtroDisponible').value;
+      const cantidadFiltroValor = document.getElementById('filtroCantidad').value.trim();
 
       let resultados = inventarioCompleto;
       if (codigo) resultados = resultados.filter(p => p.codigo.toLowerCase().includes(codigo));
@@ -150,6 +153,19 @@
       }
       if (disponibleFiltro === 'disponibles') {
         resultados = resultados.filter(p => p.disponible > 0);
+      }
+
+      if (cantidadFiltroValor !== '') {
+        const cantidadFiltroNumero = Number(cantidadFiltroValor);
+        if (!Number.isNaN(cantidadFiltroNumero)) {
+          const totalesPorCodigo = resultados.reduce((acc, item) => {
+            const codigo = item.codigo;
+            const disponible = Number(item.disponible) || 0;
+            acc[codigo] = (acc[codigo] || 0) + disponible;
+            return acc;
+          }, {});
+          resultados = resultados.filter(item => totalesPorCodigo[item.codigo] === cantidadFiltroNumero);
+        }
       }
 
       const agrupado = {};
@@ -239,7 +255,7 @@
     }
 
     function limpiarFiltros() {
-      ['filtroCodigo', 'filtroNombre'].forEach(id => {
+      ['filtroCodigo', 'filtroNombre', 'filtroCantidad'].forEach(id => {
         document.getElementById(id).value = '';
       });
       document.getElementById('filtroDisponible').value = 'disponibles';
