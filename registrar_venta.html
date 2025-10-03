@@ -21,11 +21,15 @@
     <input list="nombres" type="text" id="filtroNombre" placeholder="👟 Nombre">
     <datalist id="nombres"></datalist>
 
-    <input list="marcas" type="text" id="filtroMarca" placeholder="🏷️ Marca">
-    <datalist id="marcas"></datalist>
+    <div class="filtro-botones">
+      <span>🏷️ Marca:</span>
+      <div id="marcas-botones" class="grupo-botones"></div>
+    </div>
 
-    <input list="tallas" type="text" id="filtroTalla" placeholder="📏 Talla">
-    <datalist id="tallas"></datalist>
+    <div class="filtro-botones">
+      <span>📏 Talla:</span>
+      <div id="tallas-botones" class="grupo-botones"></div>
+    </div>
 
     <button onclick="filtrarProductos()">Buscar</button>
     <button onclick="limpiarFiltros()">Limpiar</button>
@@ -75,6 +79,8 @@
     let seleccionados = [];
     let totalFinalManual = false;
     let totalBaseActual = 0;
+    const filtrosMarcaSeleccionadas = new Set();
+    const filtrosTallaSeleccionadas = new Set();
 
     const totalFinalInput = document.getElementById('total-final');
     const fechaVentaInput = document.getElementById('fecha-venta');
@@ -139,14 +145,24 @@
     function filtrarProductos() {
       const codigo = document.getElementById('filtroCodigo').value.trim().toLowerCase();
       const nombre = document.getElementById('filtroNombre').value.trim().toLowerCase();
-      const marca = document.getElementById('filtroMarca').value.trim().toLowerCase();
-      const talla = document.getElementById('filtroTalla').value.trim();
+      const marcasSeleccionadas = Array.from(filtrosMarcaSeleccionadas).filter(Boolean);
+      const tallasSeleccionadas = Array.from(filtrosTallaSeleccionadas).filter(Boolean);
 
       let filtrados = productos;
       if (codigo) filtrados = filtrados.filter(p => p.codigo.toLowerCase().includes(codigo));
       if (nombre) filtrados = filtrados.filter(p => p.nombre.toLowerCase().includes(nombre));
-      if (marca) filtrados = filtrados.filter(p => p.marca.toLowerCase().includes(marca));
-      if (talla) filtrados = filtrados.filter(p => p.talla == talla);
+      if (marcasSeleccionadas.length) {
+        filtrados = filtrados.filter(p => {
+          const marcaNormalizada = (p.marca ?? '').toString().trim().toLowerCase();
+          return marcasSeleccionadas.includes(marcaNormalizada);
+        });
+      }
+      if (tallasSeleccionadas.length) {
+        filtrados = filtrados.filter(p => {
+          const tallaNormalizada = String(p.talla ?? '').trim();
+          return tallasSeleccionadas.includes(tallaNormalizada);
+        });
+      }
 
       mostrarProductos(filtrados);
     }
@@ -356,9 +372,13 @@
     }
 
     function limpiarFiltros() {
-      ['filtroCodigo', 'filtroNombre', 'filtroMarca', 'filtroTalla'].forEach(id => {
+      ['filtroCodigo', 'filtroNombre'].forEach(id => {
         document.getElementById(id).value = '';
       });
+      filtrosMarcaSeleccionadas.clear();
+      filtrosTallaSeleccionadas.clear();
+      actualizarBotones('marcas-botones', filtrosMarcaSeleccionadas);
+      actualizarBotones('tallas-botones', filtrosTallaSeleccionadas);
       filtrarProductos();
     }
 
@@ -380,8 +400,65 @@
 
       setDatalist('codigos', codigos);
       setDatalist('nombres', nombres);
-      setDatalist('marcas', marcas);
-      setDatalist('tallas', tallas);
+      crearBotonesFiltro('marcas-botones', [...marcas].sort((a, b) => a.localeCompare(b)), 'marca');
+      crearBotonesFiltro(
+        'tallas-botones',
+        [...tallas].sort((a, b) => {
+          const numA = parseFloat(a);
+          const numB = parseFloat(b);
+          if (!Number.isNaN(numA) && !Number.isNaN(numB)) return numA - numB;
+          return a.localeCompare(b);
+        }),
+        'talla'
+      );
+    }
+
+    function crearBotonesFiltro(containerId, valores, tipo) {
+      const contenedor = document.getElementById(containerId);
+      if (!contenedor) return;
+      contenedor.innerHTML = '';
+
+      valores.forEach(valor => {
+        const valorTexto = valor != null ? String(valor) : '';
+        const claveNormalizada = tipo === 'marca'
+          ? valorTexto.trim().toLowerCase()
+          : valorTexto.trim();
+
+        if (!claveNormalizada) return;
+
+        const boton = document.createElement('button');
+        boton.type = 'button';
+        boton.className = 'boton-filtro';
+        boton.dataset.valor = valorTexto;
+        boton.dataset.clave = claveNormalizada;
+        boton.textContent = valorTexto;
+        boton.addEventListener('click', () => {
+          const conjunto = tipo === 'marca' ? filtrosMarcaSeleccionadas : filtrosTallaSeleccionadas;
+          if (conjunto.has(claveNormalizada)) {
+            conjunto.delete(claveNormalizada);
+          } else {
+            conjunto.add(claveNormalizada);
+          }
+          actualizarBotones(containerId, conjunto);
+          filtrarProductos();
+        });
+        contenedor.appendChild(boton);
+      });
+
+      const conjunto = tipo === 'marca' ? filtrosMarcaSeleccionadas : filtrosTallaSeleccionadas;
+      actualizarBotones(containerId, conjunto);
+    }
+
+    function actualizarBotones(containerId, valoresSeleccionados) {
+      const contenedor = document.getElementById(containerId);
+      if (!contenedor) return;
+      contenedor.querySelectorAll('button').forEach(boton => {
+        const claveBoton = boton.dataset.clave ?? boton.dataset.valor ?? '';
+        const activo = valoresSeleccionados instanceof Set
+          ? valoresSeleccionados.has(claveBoton)
+          : valoresSeleccionados === claveBoton;
+        boton.classList.toggle('activo', activo);
+      });
     }
   </script>
 </body>

@@ -49,11 +49,15 @@
     <input list="nombres" type="text" id="filtroNombre" placeholder="👟 Nombre">
     <datalist id="nombres"></datalist>
 
-    <input list="marcas" type="text" id="filtroMarca" placeholder="🏷️ Marca">
-    <datalist id="marcas"></datalist>
+    <div class="filtro-botones">
+      <span>🏷️ Marca:</span>
+      <div id="marcas-botones" class="grupo-botones"></div>
+    </div>
 
-    <input list="tallas" type="text" id="filtroTalla" placeholder="📏 Talla">
-    <datalist id="tallas"></datalist>
+    <div class="filtro-botones">
+      <span>📏 Talla:</span>
+      <div id="tallas-botones" class="grupo-botones"></div>
+    </div>
 
     <select id="filtroDisponible">
       <option value="disponibles" selected>✔️ DISPONIBLES</option>
@@ -79,6 +83,8 @@
 
   <script>
     let inventarioCompleto = [];
+    const filtrosMarcaSeleccionadas = new Set();
+    const filtrosTallaSeleccionadas = new Set();
 
     (async () => {
       const sesion = await portalAuth.asegurarSesionActiva();
@@ -123,15 +129,25 @@
     function cargarInventario() {
       const codigo = document.getElementById('filtroCodigo').value.trim().toLowerCase();
       const nombre = document.getElementById('filtroNombre').value.trim().toLowerCase();
-      const marca = document.getElementById('filtroMarca').value.trim().toLowerCase();
-      const talla = document.getElementById('filtroTalla').value.trim();
+      const marcasSeleccionadas = Array.from(filtrosMarcaSeleccionadas);
+      const tallasSeleccionadas = Array.from(filtrosTallaSeleccionadas);
       const disponibleFiltro = document.getElementById('filtroDisponible').value;
 
       let resultados = inventarioCompleto;
       if (codigo) resultados = resultados.filter(p => p.codigo.toLowerCase().includes(codigo));
       if (nombre) resultados = resultados.filter(p => p.nombre.toLowerCase().includes(nombre));
-      if (marca) resultados = resultados.filter(p => p.marca.toLowerCase().includes(marca));
-      if (talla) resultados = resultados.filter(p => p.talla == talla);
+      if (marcasSeleccionadas.length) {
+        resultados = resultados.filter(p => {
+          const marcaNormalizada = (p.marca ?? '').toString().trim().toLowerCase();
+          return marcasSeleccionadas.includes(marcaNormalizada);
+        });
+      }
+      if (tallasSeleccionadas.length) {
+        resultados = resultados.filter(p => {
+          const tallaNormalizada = String(p.talla ?? '').trim();
+          return tallasSeleccionadas.includes(tallaNormalizada);
+        });
+      }
       if (disponibleFiltro === 'disponibles') {
         resultados = resultados.filter(p => p.disponible > 0);
       }
@@ -194,8 +210,8 @@
     function llenarDatalists(data) {
       const codigos = [...new Set(data.map(i => i.codigo))];
       const nombres = [...new Set(data.map(i => i.nombre))];
-      const marcas = [...new Set(data.map(i => i.marca))];
-      const tallas = [...new Set(data.map(i => i.talla))];
+      const marcas = new Set(data.map(i => i.marca));
+      const tallas = new Set(data.map(i => i.talla));
       const setDatalist = (id, values) => {
         const list = document.getElementById(id);
         list.innerHTML = '';
@@ -207,16 +223,79 @@
       };
       setDatalist('codigos', codigos);
       setDatalist('nombres', nombres);
-      setDatalist('marcas', marcas);
-      setDatalist('tallas', tallas);
+      crearBotonesFiltro('marcas-botones', [...marcas]
+        .filter(v => v != null && String(v).trim() !== '')
+        .map(v => String(v))
+        .sort((a, b) => a.localeCompare(b)), 'marca');
+      crearBotonesFiltro('tallas-botones', [...tallas]
+        .filter(v => v != null && String(v).trim() !== '')
+        .map(v => String(v))
+        .sort((a, b) => {
+          const numA = parseFloat(a);
+          const numB = parseFloat(b);
+          if (!Number.isNaN(numA) && !Number.isNaN(numB)) return numA - numB;
+          return a.localeCompare(b);
+        }), 'talla');
     }
 
     function limpiarFiltros() {
-      ['filtroCodigo', 'filtroNombre', 'filtroMarca', 'filtroTalla'].forEach(id => {
+      ['filtroCodigo', 'filtroNombre'].forEach(id => {
         document.getElementById(id).value = '';
       });
       document.getElementById('filtroDisponible').value = 'disponibles';
+      filtrosMarcaSeleccionadas.clear();
+      filtrosTallaSeleccionadas.clear();
+      actualizarBotones('marcas-botones', filtrosMarcaSeleccionadas);
+      actualizarBotones('tallas-botones', filtrosTallaSeleccionadas);
       cargarInventario();
+    }
+
+    function crearBotonesFiltro(containerId, valores, tipo) {
+      const contenedor = document.getElementById(containerId);
+      if (!contenedor) return;
+      contenedor.innerHTML = '';
+
+      valores.forEach(valor => {
+        const valorTexto = valor != null ? String(valor) : '';
+        const claveNormalizada = tipo === 'marca'
+          ? valorTexto.trim().toLowerCase()
+          : valorTexto.trim();
+
+        if (!claveNormalizada) return;
+
+        const boton = document.createElement('button');
+        boton.type = 'button';
+        boton.className = 'boton-filtro';
+        boton.dataset.valor = valorTexto;
+        boton.dataset.clave = claveNormalizada;
+        boton.textContent = valorTexto;
+        boton.addEventListener('click', () => {
+          const conjunto = tipo === 'marca' ? filtrosMarcaSeleccionadas : filtrosTallaSeleccionadas;
+          if (conjunto.has(claveNormalizada)) {
+            conjunto.delete(claveNormalizada);
+          } else {
+            conjunto.add(claveNormalizada);
+          }
+          actualizarBotones(containerId, conjunto);
+          cargarInventario();
+        });
+        contenedor.appendChild(boton);
+      });
+
+      const conjunto = tipo === 'marca' ? filtrosMarcaSeleccionadas : filtrosTallaSeleccionadas;
+      actualizarBotones(containerId, conjunto);
+    }
+
+    function actualizarBotones(containerId, valoresSeleccionados) {
+      const contenedor = document.getElementById(containerId);
+      if (!contenedor) return;
+      contenedor.querySelectorAll('button').forEach(boton => {
+        const claveBoton = boton.dataset.clave ?? boton.dataset.valor ?? '';
+        const activo = valoresSeleccionados instanceof Set
+          ? valoresSeleccionados.has(claveBoton)
+          : valoresSeleccionados === claveBoton;
+        boton.classList.toggle('activo', activo);
+      });
     }
 
     async function descargarImagenes() {
