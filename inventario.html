@@ -43,30 +43,34 @@
 
   <!-- Filtros de búsqueda -->
   <div id="filtros-container">
-    <input list="codigos" type="text" id="filtroCodigo" placeholder="🔍 Código">
-    <datalist id="codigos"></datalist>
+    <div class="campo-filtro">
+      <label for="filtroCantidad">🔢 Cantidad total</label>
+      <input type="number" id="filtroCantidad" min="0" step="1" placeholder="Ej. 1">
+    </div>
 
-    <input list="nombres" type="text" id="filtroNombre" placeholder="👟 Nombre">
-    <datalist id="nombres"></datalist>
-
-    <div class="filtro-botones">
-      <span>🏷️ Marca:</span>
+    <div class="campo-filtro filtro-botones">
+      <span>🏷️ Marca</span>
       <div id="marcas-botones" class="grupo-botones"></div>
     </div>
 
-    <div class="filtro-botones">
-      <span>📏 Talla:</span>
+    <div class="campo-filtro filtro-botones">
+      <span>📏 Talla</span>
       <div id="tallas-botones" class="grupo-botones"></div>
     </div>
 
-    <select id="filtroDisponible">
-      <option value="disponibles" selected>✔️ DISPONIBLES</option>
-      <option value="todos">📦 TODOS</option>
-    </select>
+    <div class="campo-filtro">
+      <label for="filtroDisponible">Estado</label>
+      <select id="filtroDisponible">
+        <option value="disponibles" selected>✔️ Disponibles</option>
+        <option value="todos">📦 Todos</option>
+      </select>
+    </div>
 
-    <button onclick="cargarInventario()">Buscar</button>
-    <button onclick="limpiarFiltros()">Limpiar</button>
-    <button onclick="descargarImagenes()">Descargar Imágenes</button>
+    <div class="acciones-filtros">
+      <button class="btn-accion primario" onclick="cargarInventario()">🔍 Buscar</button>
+      <button class="btn-accion" onclick="limpiarFiltros()">🧹 Limpiar</button>
+      <button class="btn-accion secundario" onclick="descargarImagenes()">⬇️ Descargar imágenes</button>
+    </div>
   </div>
 
   <div id="modal-progreso">
@@ -123,19 +127,16 @@
         else desde += tamanoPagina;
       }
 
-      llenarDatalists(inventarioCompleto);
+      llenarFiltros(inventarioCompleto);
     }
 
     function cargarInventario() {
-      const codigo = document.getElementById('filtroCodigo').value.trim().toLowerCase();
-      const nombre = document.getElementById('filtroNombre').value.trim().toLowerCase();
       const marcasSeleccionadas = Array.from(filtrosMarcaSeleccionadas);
       const tallasSeleccionadas = Array.from(filtrosTallaSeleccionadas);
       const disponibleFiltro = document.getElementById('filtroDisponible').value;
+      const cantidadFiltroValor = document.getElementById('filtroCantidad').value.trim();
 
       let resultados = inventarioCompleto;
-      if (codigo) resultados = resultados.filter(p => p.codigo.toLowerCase().includes(codigo));
-      if (nombre) resultados = resultados.filter(p => p.nombre.toLowerCase().includes(nombre));
       if (marcasSeleccionadas.length) {
         resultados = resultados.filter(p => {
           const marcaNormalizada = (p.marca ?? '').toString().trim().toLowerCase();
@@ -150,6 +151,19 @@
       }
       if (disponibleFiltro === 'disponibles') {
         resultados = resultados.filter(p => p.disponible > 0);
+      }
+
+      if (cantidadFiltroValor !== '') {
+        const cantidadFiltroNumero = Number(cantidadFiltroValor);
+        if (!Number.isNaN(cantidadFiltroNumero)) {
+          const totalesPorCodigo = resultados.reduce((acc, item) => {
+            const codigo = item.codigo;
+            const disponible = Number(item.disponible) || 0;
+            acc[codigo] = (acc[codigo] || 0) + disponible;
+            return acc;
+          }, {});
+          resultados = resultados.filter(item => totalesPorCodigo[item.codigo] === cantidadFiltroNumero);
+        }
       }
 
       const agrupado = {};
@@ -207,22 +221,9 @@
       }
     }
 
-    function llenarDatalists(data) {
-      const codigos = [...new Set(data.map(i => i.codigo))];
-      const nombres = [...new Set(data.map(i => i.nombre))];
+    function llenarFiltros(data) {
       const marcas = new Set(data.map(i => i.marca));
       const tallas = new Set(data.map(i => i.talla));
-      const setDatalist = (id, values) => {
-        const list = document.getElementById(id);
-        list.innerHTML = '';
-        values.forEach(v => {
-          const option = document.createElement('option');
-          option.value = v;
-          list.appendChild(option);
-        });
-      };
-      setDatalist('codigos', codigos);
-      setDatalist('nombres', nombres);
       crearBotonesFiltro('marcas-botones', [...marcas]
         .filter(v => v != null && String(v).trim() !== '')
         .map(v => String(v))
@@ -239,9 +240,7 @@
     }
 
     function limpiarFiltros() {
-      ['filtroCodigo', 'filtroNombre'].forEach(id => {
-        document.getElementById(id).value = '';
-      });
+      document.getElementById('filtroCantidad').value = '';
       document.getElementById('filtroDisponible').value = 'disponibles';
       filtrosMarcaSeleccionadas.clear();
       filtrosTallaSeleccionadas.clear();
