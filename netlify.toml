@@ -1,0 +1,74 @@
+# La aplicación vive en la carpeta web/ (React + Vite).
+[build]
+  base = "web"
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# Direcciones del sitio anterior → pantallas nuevas (por si alguien tiene guardado un enlace viejo)
+[[redirects]]
+  from = "/login.html"
+  to = "/"
+  status = 301
+[[redirects]]
+  from = "/inventario.html"
+  to = "/inventario"
+  status = 301
+[[redirects]]
+  from = "/agregar.html"
+  to = "/inventario?nuevo=1"
+  status = 301
+[[redirects]]
+  from = "/modificar.html"
+  to = "/inventario"
+  status = 301
+[[redirects]]
+  from = "/eliminar.html"
+  to = "/inventario"
+  status = 301
+[[redirects]]
+  from = "/registrar_venta.html"
+  to = "/ventas/nueva"
+  status = 301
+[[redirects]]
+  from = "/ver_ventas.html"
+  to = "/ventas"
+  status = 301
+[[redirects]]
+  from = "/modificar_venta.html"
+  to = "/ventas"
+  status = 301
+[[redirects]]
+  from = "/crear_cliente.html"
+  to = "/clientes?nuevo=1"
+  status = 301
+[[redirects]]
+  from = "/modificar_cliente.html"
+  to = "/clientes"
+  status = 301
+
+# Aplicación de una sola página: todas las rutas cargan index.html
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(self), microphone=(), geolocation=()"
