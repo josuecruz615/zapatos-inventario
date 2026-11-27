@@ -25,7 +25,8 @@ export default function ValidarMarcas() {
         abierta: delaMarca.find((c) => c.estado === 'abierto') ?? null,
         ultima: delaMarca.find((c) => c.estado === 'cerrado') ?? null,
       }
-    }).filter((m) => m.modelos > 0)
+    // Solo marcas con pares en el sistema (o con una validación en curso).
+    }).filter((m) => m.pares > 0 || m.abierta)
   }, [marcas.data, inventario.data, conteos.data])
 
   async function empezar(marcaId: number) {
@@ -45,7 +46,7 @@ export default function ValidarMarcas() {
         actions={<Link to="/inventario"><Button variant="ghost"><ArrowLeft /> Inventario</Button></Link>} />
 
       {cargando ? <Skeleton className="h-96 rounded-2xl" /> : !filas.length ? (
-        <Empty icon={ClipboardCheck} title="No hay marcas con productos activos" />
+        <Empty icon={ClipboardCheck} title="No hay marcas con pares en existencia" />
       ) : (
         <Card className="overflow-hidden">
           <ul className="divide-y divide-border">
