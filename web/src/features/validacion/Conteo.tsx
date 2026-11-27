@@ -1,5 +1,5 @@
 import * as DM from '@radix-ui/react-dropdown-menu'
-import { ArrowLeft, Check, CheckCircle2, CircleSlash, CloudOff, EllipsisVertical, LoaderCircle, RotateCcw } from 'lucide-react'
+import { ArrowLeft, Check, CheckCircle2, CircleSlash, CloudOff, EllipsisVertical, LoaderCircle, Plus, RotateCcw, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
@@ -29,6 +29,8 @@ export default function Conteo() {
   const [estados, setEstados] = useState<Map<number, Estado>>(new Map())
   const temporizadores = useRef(new Map<number, ReturnType<typeof setTimeout>>())
   const [busqueda, setBusqueda] = useState('')
+  // Los agotados casi nunca aparecen físicamente: se buscan aparte para no alargar la lista.
+  const [verAgotados, setVerAgotados] = useState(false)
   const [cerrar, setCerrar] = useState(false)
 
   const productos = useMemo(() => (inventario.data ?? [])
@@ -67,29 +69,37 @@ export default function Conteo() {
     return () => removeEventListener('beforeunload', aviso)
   }, [pendientes])
 
-  const filas = useMemo(() => {
-    const t = normalizar(busqueda)
-    return productos
+  // Lista principal: lo que el sistema dice que hay en esta talla + lo que ya se contó.
+  const { principal, agotados } = useMemo(() => {
+    const todas = productos
       .map((p) => ({ p, t: p.tallas.find((x) => x.talla === tallaSel) }))
       .filter((x): x is { p: typeof x.p; t: NonNullable<typeof x.t> } => !!x.t)
-      .filter(({ p }) => !t || normalizar(`${p.codigo} ${p.nombre}`).includes(t))
-      .sort((a, b) => (b.t.existencia > 0 ? 1 : 0) - (a.t.existencia > 0 ? 1 : 0) || a.p.nombre.localeCompare(b.p.nombre))
-  }, [productos, tallaSel, busqueda])
+      .sort((a, b) => a.p.nombre.localeCompare(b.p.nombre))
+    return {
+      principal: todas.filter(({ t }) => t.existencia > 0 || contado(t.id) !== undefined),
+      agotados: todas.filter(({ t }) => t.existencia <= 0 && contado(t.id) === undefined),
+    }
+  }, [productos, tallaSel, contado])
+
+  const filas = useMemo(() => {
+    const t = normalizar(busqueda)
+    return (verAgotados ? agotados : principal).filter(({ p }) => !t || normalizar(`${p.codigo} ${p.nombre}`).includes(t))
+  }, [verAgotados, agotados, principal, busqueda])
 
   const resumenTalla = useMemo(() => {
     let contados = 0, diferencias = 0, pares = 0
-    for (const { t } of filas) {
+    for (const { t } of principal) {
       const c = contado(t.id)
       if (c !== undefined) { contados++; pares += c }
       const efectivo = c ?? (infoTalla?.terminada ? 0 : undefined)
       if (efectivo !== undefined && efectivo !== t.existencia) diferencias++
     }
     return { contados, diferencias, pares }
-  }, [filas, contado, infoTalla?.terminada])
+  }, [principal, contado, infoTalla?.terminada])
 
   async function terminarTalla() {
     if (pendientes) return toast.info('Esperando que se guarden los últimos conteos…')
-    const sinContar = filas.filter(({ t }) => contado(t.id) === undefined && t.existencia > 0)
+    const sinContar = principal.filter(({ t }) => contado(t.id) === undefined && t.existencia > 0)
     if (sinContar.length) {
       const ok = await confirmar({
         titulo: `¿Terminar la talla ${fTalla(tallaSel!)}?`, confirmar: 'Terminar talla',
@@ -103,6 +113,7 @@ export default function Conteo() {
       toast.success(`Talla ${fTalla(tallaSel!)} terminada`, { description: siguiente ? `Sigue la talla ${fTalla(siguiente.talla)}` : 'Ya puedes revisar y cerrar.' })
       if (siguiente) setParams({ talla: String(siguiente.talla) }, { replace: true })
       setBusqueda('')
+      setVerAgotados(false)
       scrollTo({ top: 0, behavior: 'smooth' })
     } catch (e) { toast.error(mensajeError(e)) }
   }
@@ -169,7 +180,7 @@ export default function Conteo() {
       {/* Selector de talla */}
       <div className="scrollbar-none -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
         {tallas.map((t) => (
-          <Chip key={t.talla} active={t.talla === tallaSel} onClick={() => { setParams({ talla: String(t.talla) }, { replace: true }); setBusqueda('') }}
+          <Chip key={t.talla} active={t.talla === tallaSel} onClick={() => { setParams({ talla: String(t.talla) }, { replace: true }); setBusqueda(''); setVerAgotados(false) }}
             className={cn('tabular min-w-16 justify-center', t.terminada && t.talla !== tallaSel && 'border-success/40 bg-success/10 text-success')}>
             {t.terminada && <Check className="size-3.5" />} {fTalla(t.talla)}
           </Chip>
@@ -186,9 +197,29 @@ export default function Conteo() {
         </Card>
       )}
 
-      <div className="flex items-center gap-2">
-        <SearchInput value={busqueda} onChange={setBusqueda} placeholder={`Buscar en talla ${tallaSel ? fTalla(tallaSel) : ''}`} className="flex-1" />
-      </div>
+      {verAgotados ? (
+        <div className="grid animate-in gap-3 rounded-2xl border border-accent/40 bg-accent/5 p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="text-sm">
+              <p className="font-semibold">Agregar un modelo que no aparece</p>
+              <p className="text-muted-foreground">Modelos de {c.marca} en talla {tallaSel ? fTalla(tallaSel) : ''} que el sistema tiene en 0. Búscalo y marca cuántos encontraste.</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => { setVerAgotados(false); setBusqueda('') }}><X /> Cerrar</Button>
+          </div>
+          <SearchInput value={busqueda} onChange={setBusqueda} placeholder="Código o nombre del modelo" autoFocus />
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          {principal.length > 6 && (
+            <SearchInput value={busqueda} onChange={setBusqueda} placeholder={`Buscar en talla ${tallaSel ? fTalla(tallaSel) : ''}`} className="min-w-48 flex-1" />
+          )}
+          {agotados.length > 0 && (
+            <Button variant="outline" onClick={() => { setVerAgotados(true); setBusqueda('') }} className={cn(principal.length <= 6 && 'w-full sm:w-auto')}>
+              <Plus /> Agregar uno que no aparece
+            </Button>
+          )}
+        </div>
+      )}
 
       {conError.length > 0 && (
         <p className="flex items-center gap-2 rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">
@@ -198,7 +229,12 @@ export default function Conteo() {
       )}
 
       {/* Lista de modelos de la talla */}
-      {!filas.length ? <Empty icon={CircleSlash} title="No hay modelos en esta talla" /> : (
+      {!filas.length ? (
+        verAgotados
+          ? <Empty icon={CircleSlash} title={busqueda ? `No hay agotados que coincidan con “${busqueda}”` : 'No hay modelos agotados en esta talla'} />
+          : <Empty icon={CheckCircle2} title={busqueda ? `Nada coincide con “${busqueda}”` : `Sin existencias en talla ${tallaSel ? fTalla(tallaSel) : ''}`}
+              description={busqueda ? undefined : 'Según el sistema no hay pares de esta marca en esta talla. Si encontraste alguno, usa “Agregar uno que no aparece”; si no, termina la talla.'} />
+      ) : (
         <Card className="overflow-hidden">
           <ul className="divide-y divide-border">
             {filas.map(({ p, t }) => {
@@ -228,7 +264,15 @@ export default function Conteo() {
                         <Check /> Hay {t.existencia}
                       </Button>
                     ) : null}
-                    <Stepper size="sm" value={valor ?? 0} onChange={(v) => fijar(t.id, v)} label={`${p.nombre} talla ${fTalla(t.talla)}`} />
+                    <Stepper size="sm" value={valor ?? 0} label={`${p.nombre} talla ${fTalla(t.talla)}`}
+                      onChange={(v) => {
+                        fijar(t.id, v)
+                        if (verAgotados && v > 0) {
+                          setVerAgotados(false)
+                          setBusqueda('')
+                          toast.success(`${p.nombre} agregado a la talla ${fTalla(t.talla)}`)
+                        }
+                      }} />
                   </div>
                 </li>
               )
