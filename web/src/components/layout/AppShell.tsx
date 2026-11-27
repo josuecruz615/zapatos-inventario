@@ -77,7 +77,8 @@ export function AppShell() {
   const { pathname } = useLocation()
   const navegar = useNavigate()
   useEffect(() => { window.scrollTo(0, 0) }, [pathname])
-  const enVenta = pathname.startsWith('/ventas/nueva') || /\/ventas\/\d+\/editar/.test(pathname)
+  const enConteo = /\/inventario\/validar\/\d+/.test(pathname)
+  const enVenta = pathname.startsWith('/ventas/nueva') || /\/ventas\/\d+\/editar/.test(pathname) || /\/inventario\/validar\/\d+/.test(pathname)
 
   return (
     <div className="min-h-dvh lg:pl-64">
@@ -105,7 +106,7 @@ export function AppShell() {
       </header>
       <AvisoInstalar />
 
-      <main className={cn('mx-auto w-full max-w-7xl px-4 pt-5 sm:px-6 lg:px-8 lg:pt-8', enVenta ? 'pb-40 lg:pb-10' : 'pb-28 lg:pb-10')}>
+      <main className={cn('mx-auto w-full max-w-7xl px-4 pt-5 sm:px-6 lg:px-8 lg:pt-8', enConteo ? 'pb-40' : enVenta ? 'pb-40 lg:pb-10' : 'pb-28 lg:pb-10')}>
         <Outlet />
       </main>
 

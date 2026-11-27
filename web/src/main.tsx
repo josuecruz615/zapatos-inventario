@@ -17,6 +17,8 @@ const Ventas = lazy(() => import('./features/ventas/Ventas'))
 const NuevaVenta = lazy(() => import('./features/ventas/NuevaVenta'))
 const EditarVenta = lazy(() => import('./features/ventas/EditarVenta'))
 const Clientes = lazy(() => import('./features/clientes/Clientes'))
+const ValidarMarcas = lazy(() => import('./features/validacion/ValidarMarcas'))
+const Conteo = lazy(() => import('./features/validacion/Conteo'))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -56,6 +58,8 @@ const router = createBrowserRouter([
       { errorElement: <ErrorPagina />, children: [
         { index: true, element: conSuspense(<Inicio />) },
         { path: 'inventario', element: conSuspense(<Inventario />) },
+        { path: 'inventario/validar', element: conSuspense(<ValidarMarcas />) },
+        { path: 'inventario/validar/:id', element: conSuspense(<Conteo />) },
         { path: 'ventas', element: conSuspense(<Ventas />) },
         { path: 'ventas/nueva', element: conSuspense(<NuevaVenta />) },
         { path: 'ventas/:id/editar', element: conSuspense(<EditarVenta />) },

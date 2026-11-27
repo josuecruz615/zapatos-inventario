@@ -84,7 +84,7 @@ export type VentasPorProducto = {
 export type Movimiento = {
   id: number
   created_at: string
-  tipo: 'migracion' | 'entrada' | 'ajuste' | 'venta' | 'devolucion'
+  tipo: 'migracion' | 'entrada' | 'ajuste' | 'venta' | 'devolucion' | 'conteo'
   cantidad: number
   existencia_resultante: number
   venta_id: number | null
@@ -110,4 +110,30 @@ export type ItemCarrito = {
   cantidad: number
   /** Máximo vendible: existencia actual + lo que ya tenía la venta (al editar). */
   maximo: number
+}
+
+export type ResumenConteo = {
+  tallas_revisadas: number; con_mas: number; con_menos: number; correctas: number; pares_antes: number; pares_despues: number
+}
+
+export type Conteo = {
+  id: number
+  marca_id: number
+  marca: string
+  estado: 'abierto' | 'cerrado' | 'cancelado'
+  nota: string | null
+  resumen: ResumenConteo | null
+  created_at: string
+  cerrado_at: string | null
+  tallas_total: number
+  tallas_terminadas: number
+  lineas_contadas: number
+}
+
+export type ConteoTalla = { talla: number; terminada: boolean; terminado_at: string | null }
+export type ConteoLinea = { producto_talla_id: number; contado: number; updated_at: string }
+
+export type PreviaConteo = {
+  producto_talla_id: number; producto_id: number; codigo: string; nombre: string; imagen_url: string | null
+  talla: number; sistema: number; contado: number; movido_despues: number; final: number
 }

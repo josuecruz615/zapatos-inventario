@@ -37,6 +37,8 @@ Las existencias y las ventas **solo** cambian por estas funciones; la escritura 
 4. `..._storage.sql` — fotos: lectura pública, escritura solo miembros.
 5. `..._cerrar_funcion_legacy.sql` — quita el acceso a la función vieja `validar_codigo_acceso`.
 6. `..._ajustes_revision.sql` — vistas solo lectura, vistas de reportes, mensaje claro para total negativo y protección para no volver a copiar los datos viejos encima de trabajo nuevo (`private.migrar_desde_legacy(p_forzar => true)` para forzar).
+7. `..._tablas_viejas_solo_lectura.sql` — tras publicar la interfaz nueva, las tablas en MAYÚSCULAS quedan en solo lectura.
+8. `..._validacion_inventario.sql` + `..._validacion_hora_exacta.sql` — validación de inventario por marca, talla por talla (`conteos`, `conteo_tallas`, `conteo_lineas`, vista `v_conteos`; funciones `iniciar_conteo`, `registrar_conteo`, `marcar_talla_conteo`, `previa_conteo`, `cerrar_conteo`, `cancelar_conteo`). Al cerrar: existencia = contado + movimientos posteriores al conteo; lo no contado en una talla terminada queda en 0.
 
 Los nombres de archivo coinciden con las versiones registradas en Supabase (aplicadas el 2026-11-26). Datos copiados ese mismo día.
 

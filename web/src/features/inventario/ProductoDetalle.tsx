@@ -193,7 +193,7 @@ function EditorExistencias({ producto }: { producto: Producto }) {
 }
 
 const etiquetas: Record<Movimiento['tipo'], string> = {
-  migracion: 'Saldo inicial', entrada: 'Entrada', ajuste: 'Ajuste', venta: 'Venta', devolucion: 'Devolución',
+  migracion: 'Saldo inicial', entrada: 'Entrada', ajuste: 'Ajuste', venta: 'Venta', devolucion: 'Devolución', conteo: 'Validación',
 }
 
 function Historial({ productoId }: { productoId: number }) {

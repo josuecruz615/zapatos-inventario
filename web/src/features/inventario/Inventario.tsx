@@ -1,11 +1,11 @@
-import { Download, LayoutGrid, List, PackagePlus, PackageSearch, SlidersHorizontal, X } from 'lucide-react'
+import { ChevronRight, ClipboardCheck, Download, LayoutGrid, List, PackagePlus, PackageSearch, SlidersHorizontal, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input, SearchInput, Select } from '@/components/ui/form'
 import { Badge, Card, Chip, Empty, FotoProducto, PageHeader, Segmented, Skeleton, tonoExistencia } from '@/components/ui/misc'
-import { useInventario } from '@/lib/api'
+import { useConteos, useInventario } from '@/lib/api'
 import type { Producto } from '@/lib/types'
 import { cn, normalizar, num, q, talla } from '@/lib/utils'
 import { compartir, fotoComoArchivo, puedeCompartirArchivos } from '@/lib/dispositivo'
@@ -30,6 +30,7 @@ const lista = (v: string | null) => (v ? v.split(',').filter(Boolean) : [])
 
 export default function Inventario() {
   const { data, isLoading, error } = useInventario()
+  const abiertas = (useConteos().data ?? []).filter((c) => c.estado === 'abierto')
   const [params, setParams] = useSearchParams()
   const [verFiltros, setVerFiltros] = useState(false)
   const [descargando, setDescargando] = useState(false)
@@ -184,9 +185,22 @@ export default function Inventario() {
           <Button variant="outline" onClick={bajarFotos} loading={descargando} disabled={!filtrados.length}>
             <Download /> <span className="hidden sm:inline">Descargar fotos</span><span className="sm:hidden">Fotos</span>
           </Button>
-          <Button variant="accent" onClick={() => set({ nuevo: '1' }, false)}><PackagePlus /> Nuevo producto</Button>
+          <Link to="/inventario/validar"><Button variant="outline"><ClipboardCheck /> Validar</Button></Link>
+          <Button variant="accent" onClick={() => set({ nuevo: '1' }, false)}><PackagePlus /> <span className="hidden sm:inline">Nuevo producto</span><span className="sm:hidden">Nuevo</span></Button>
         </>}
       />
+
+      {abiertas.map((c) => (
+        <Link key={c.id} to={`/inventario/validar/${c.id}`}
+          className="flex items-center gap-3 rounded-2xl border border-accent/40 bg-accent/5 px-4 py-3 hover:bg-accent/10">
+          <ClipboardCheck className="size-5 shrink-0 text-accent" />
+          <div className="min-w-0 flex-1 text-sm">
+            <p className="font-semibold">Validación de {c.marca} en curso</p>
+            <p className="text-muted-foreground">{c.tallas_terminadas} de {c.tallas_total} tallas terminadas</p>
+          </div>
+          <span className="flex items-center text-sm font-medium text-accent">Continuar <ChevronRight className="size-4" /></span>
+        </Link>
+      ))}
 
       <div className="grid gap-3">
         <div className="flex flex-wrap items-center gap-2">

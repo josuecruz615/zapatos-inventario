@@ -18,6 +18,7 @@ Aplicación de inventario, ventas y clientes. Usa la base nueva de Supabase (ver
 | `/ventas/nueva` | Punto de venta: buscar, filtrar por marca/talla, tocar la talla para agregar; cliente con buscador (y alta rápida); alerta si el cliente tiene problemas; fecha; total final con atajos de descuento/envío; nota. Al terminar: recibo por WhatsApp. |
 | `/ventas` | Ventas de hoy / mes / año / todo, agrupadas por día con totales; buscar por cliente o número; exportar CSV. Detalle con recibo (WhatsApp o copiar), editar y eliminar (devuelve existencias). |
 | `/ventas/:id/editar` | Edita productos, cantidades, cliente, fecha, total y nota; el inventario se ajusta solo con la diferencia. |
+| `/inventario/validar` | Validar inventario por marca, talla por talla: marcar lo encontrado (botón "Hay n" si coincide), terminar cada talla (lo no contado queda en 0), revisar diferencias y cerrar. El avance se guarda y se puede seguir desde otro teléfono. |
 | `/clientes` | Lista con búsqueda por nombre o teléfono, orden por mejores clientes o recientes, filtro "con problemas". Detalle con llamar/WhatsApp, historial y totales. |
 
 ## Uso local

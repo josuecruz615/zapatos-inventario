@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { BUCKET_FOTOS, supabase } from './supabase'
 import type {
-  Cliente, ItemCarrito, Movimiento, Producto, ResumenMes, Venta, VentaItem, VentasPorProducto,
+  Cliente, Conteo, ConteoLinea, ConteoTalla, ItemCarrito, Movimiento, PreviaConteo, Producto, ResumenConteo, ResumenMes, Venta, VentaItem, VentasPorProducto,
 } from './types'
 
 /** PostgREST devuelve máximo 1000 filas por consulta: esta función pagina hasta traer todo. */
@@ -385,5 +385,134 @@ export function useEliminarVenta() {
       if (error) throw error
     },
     onSuccess: () => invalidarTrasVenta(qc),
+  })
+}
+
+// ---------------------------------------------------------------- Validación de inventario
+export const clavesConteo = {
+  lista: ['conteos'] as const,
+  uno: (id: number) => ['conteo', id] as const,
+  detalle: (id: number) => ['conteo-detalle', id] as const,
+  previa: (id: number) => ['conteo-previa', id] as const,
+}
+
+const normalizarConteo = (c: Conteo): Conteo => ({
+  ...c, tallas_total: n(c.tallas_total), tallas_terminadas: n(c.tallas_terminadas), lineas_contadas: n(c.lineas_contadas),
+})
+
+export function useConteos() {
+  return useQuery({
+    queryKey: clavesConteo.lista,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('v_conteos').select('*').order('created_at', { ascending: false }).limit(200)
+      if (error) throw error
+      return (data as Conteo[]).map(normalizarConteo)
+    },
+  })
+}
+
+export function useConteo(id: number | null) {
+  return useQuery({
+    queryKey: clavesConteo.uno(id ?? 0),
+    enabled: !!id,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('v_conteos').select('*').eq('id', id!).maybeSingle()
+      if (error) throw error
+      return data ? normalizarConteo(data as Conteo) : null
+    },
+  })
+}
+
+/** Tallas y cantidades contadas. Se refresca solo cada 15 s por si cuentan desde dos teléfonos. */
+export function useConteoDetalle(id: number | null, activo: boolean) {
+  return useQuery({
+    queryKey: clavesConteo.detalle(id ?? 0),
+    enabled: !!id,
+    refetchInterval: activo ? 15_000 : false,
+    queryFn: async () => {
+      const [tallas, lineas] = await Promise.all([
+        supabase.from('conteo_tallas').select('talla, terminada, terminado_at').eq('conteo_id', id!).order('talla'),
+        traerTodo<ConteoLinea>((a, b) => supabase.from('conteo_lineas').select('producto_talla_id, contado, updated_at').eq('conteo_id', id!).range(a, b) as never),
+      ])
+      if (tallas.error) throw tallas.error
+      return {
+        tallas: (tallas.data ?? []).map((t) => ({ ...t, talla: n(t.talla) })) as ConteoTalla[],
+        lineas: new Map(lineas.map((l) => [l.producto_talla_id, n(l.contado)])),
+      }
+    },
+  })
+}
+
+export function usePreviaConteo(id: number | null, enabled: boolean) {
+  return useQuery({
+    queryKey: clavesConteo.previa(id ?? 0),
+    enabled: !!id && enabled,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('previa_conteo', { p_conteo_id: id! })
+      if (error) throw error
+      return (data as PreviaConteo[]).map((r) => ({
+        ...r, talla: n(r.talla), sistema: n(r.sistema), contado: n(r.contado), movido_despues: n(r.movido_despues), final: n(r.final),
+      }))
+    },
+  })
+}
+
+export function useIniciarConteo() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (marcaId: number) => {
+      const { data, error } = await supabase.rpc('iniciar_conteo', { p_marca_id: marcaId })
+      if (error) throw error
+      return data as number
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: clavesConteo.lista }),
+  })
+}
+
+export async function guardarConteo(conteoId: number, productoTallaId: number, contado: number) {
+  const { error } = await supabase.rpc('registrar_conteo', { p_conteo_id: conteoId, p_producto_talla_id: productoTallaId, p_contado: contado })
+  if (error) throw error
+}
+
+export function useMarcarTalla(conteoId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (v: { talla: number; terminada: boolean }) => {
+      const { error } = await supabase.rpc('marcar_talla_conteo', { p_conteo_id: conteoId, p_talla: v.talla, p_terminada: v.terminada })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: clavesConteo.detalle(conteoId) })
+      qc.invalidateQueries({ queryKey: clavesConteo.uno(conteoId) })
+      qc.invalidateQueries({ queryKey: clavesConteo.lista })
+    },
+  })
+}
+
+export function useCerrarConteo(conteoId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (nota: string) => {
+      const { data, error } = await supabase.rpc('cerrar_conteo', { p_conteo_id: conteoId, p_nota: nota || undefined })
+      if (error) throw error
+      return data as ResumenConteo
+    },
+    onSuccess: () => {
+      for (const k of [clavesConteo.lista, clavesConteo.uno(conteoId), claves.inventario, ['movimientos'], claves.porProducto]) qc.invalidateQueries({ queryKey: k })
+    },
+  })
+}
+
+export function useCancelarConteo(conteoId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc('cancelar_conteo', { p_conteo_id: conteoId })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: clavesConteo.lista })
+      qc.invalidateQueries({ queryKey: clavesConteo.uno(conteoId) })
+    },
   })
 }
