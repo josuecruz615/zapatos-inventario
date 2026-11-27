@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useEffect } from 'react'
+import { ClipboardPaste } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { z } from 'zod'
@@ -8,6 +9,8 @@ import { Dialog } from '@/components/ui/dialog'
 import { Field, Input, Switch, Textarea } from '@/components/ui/form'
 import { useGuardarCliente } from '@/lib/api'
 import type { Cliente } from '@/lib/types'
+import { useMediaQuery } from '@/lib/hooks'
+import { leerCliente } from '@/lib/parsearCliente'
 import { mensajeError } from '@/lib/utils'
 
 const esquema = z.object({
@@ -23,7 +26,28 @@ export function ClienteForm({ open, cliente, onClose, nombreInicial }: {
   open: boolean; cliente: Cliente | null; onClose: (guardado?: Cliente) => void; nombreInicial?: string
 }) {
   const guardar = useGuardarCliente()
-  const { register, handleSubmit, reset, control, formState: { errors } } = useForm<Valores>({ resolver: zodResolver(esquema) })
+  const { register, handleSubmit, reset, control, setValue, formState: { errors } } = useForm<Valores>({ resolver: zodResolver(esquema) })
+  const [pegarTexto, setPegarTexto] = useState<string | null>(null)
+  // En el celular no se abre el teclado solo: primero se puede usar "Llenar con un mensaje copiado".
+  const escritorio = useMediaQuery('(min-width: 1024px)')
+
+  function llenar(texto: string) {
+    const c = leerCliente(texto)
+    if (!c.nombre && !c.telefono && !c.direccion) return toast.error('No encontré nombre, teléfono ni dirección en el texto')
+    if (c.nombre) setValue('nombre', c.nombre, { shouldValidate: true })
+    if (c.telefono) setValue('telefono', c.telefono, { shouldValidate: true })
+    if (c.direccion) setValue('direccion', c.direccion)
+    setPegarTexto(null)
+    toast.success('Datos llenados. Revísalos antes de guardar.')
+  }
+
+  async function pegar() {
+    try {
+      const t = await navigator.clipboard.readText()
+      if (t.trim()) return llenar(t)
+    } catch { /* Safari puede negarlo: se muestra el cuadro para pegar a mano */ }
+    setPegarTexto('')
+  }
 
   useEffect(() => {
     if (open) reset({
@@ -49,8 +73,21 @@ export function ClienteForm({ open, cliente, onClose, nombreInicial }: {
         <Button onClick={enviar} loading={guardar.isPending}>{cliente ? 'Guardar cambios' : 'Crear cliente'}</Button>
       </>}>
       <form onSubmit={enviar} className="grid gap-4">
+        {!cliente && (pegarTexto === null ? (
+          <Button variant="outline" onClick={pegar}><ClipboardPaste /> Llenar con un mensaje copiado</Button>
+        ) : (
+          <div className="grid gap-2 rounded-xl border border-border p-3">
+            <Textarea rows={4} autoFocus value={pegarTexto} placeholder="Pega aquí el mensaje del cliente"
+              onChange={(e) => setPegarTexto(e.target.value)}
+              onPaste={(e) => { const t = e.clipboardData.getData('text'); if (t) setTimeout(() => llenar(t), 0) }} />
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setPegarTexto(null)}>Cancelar</Button>
+              <Button size="sm" onClick={() => llenar(pegarTexto)} disabled={!pegarTexto.trim()}>Llenar</Button>
+            </div>
+          </div>
+        ))}
         <Field label="Nombre completo" error={errors.nombre?.message} htmlFor="c-nombre">
-          <Input id="c-nombre" autoFocus autoComplete="off" aria-invalid={!!errors.nombre} {...register('nombre')} />
+          <Input id="c-nombre" autoFocus={escritorio} autoComplete="off" aria-invalid={!!errors.nombre} {...register('nombre')} />
         </Field>
         <Field label="Teléfono" error={errors.telefono?.message} hint="Se usa para enviarle el recibo por WhatsApp." htmlFor="c-tel">
           <Input id="c-tel" type="tel" inputMode="tel" placeholder="5555-1234" aria-invalid={!!errors.telefono} {...register('telefono')} />

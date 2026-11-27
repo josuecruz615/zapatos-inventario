@@ -1,4 +1,4 @@
-import { AlertTriangle, MapPin, MessageCircle, Pencil, Phone, ShoppingBag, StickyNote, Trash2, UserPlus, Users } from 'lucide-react'
+import { AlertTriangle, ClipboardPaste, MapPin, MessageCircle, Pencil, Phone, ShoppingBag, StickyNote, Trash2, UserPlus, Users } from 'lucide-react'
 import { useMemo } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
@@ -10,6 +10,7 @@ import { useClientes, useEliminarCliente, useVentas, useVentasDeCliente } from '
 import type { Cliente } from '@/lib/types'
 import { enlaceWhatsApp, fecha, mensajeError, normalizar, num, q, telefonoBonito } from '@/lib/utils'
 import { ClienteForm } from './ClienteForm'
+import { PegarClientes } from './PegarClientes'
 
 type Orden = 'nombre' | 'compras' | 'reciente'
 
@@ -23,6 +24,7 @@ export default function Clientes() {
   const clienteId = Number(params.get('cliente')) || null
   const editarId = Number(params.get('editar')) || null
   const nuevo = params.get('nuevo') === '1'
+  const pegar = params.get('pegar') === '1'
 
   const set = (cambios: Record<string, string | null>, reemplazar = true) => {
     const p = new URLSearchParams(params)
@@ -63,7 +65,10 @@ export default function Clientes() {
   return (
     <div className="grid gap-5">
       <PageHeader title="Clientes" description={isLoading ? 'Cargando…' : `${num(data?.length ?? 0)} clientes registrados`}
-        actions={<Button variant="accent" onClick={() => set({ nuevo: '1' }, false)}><UserPlus /> Nuevo cliente</Button>} />
+        actions={<>
+          <Button variant="outline" onClick={() => set({ pegar: '1' }, false)}><ClipboardPaste /> Pegar de WhatsApp</Button>
+          <Button variant="accent" onClick={() => set({ nuevo: '1' }, false)}><UserPlus /> Nuevo</Button>
+        </>} />
 
       <div className="flex flex-wrap items-center gap-3">
         <SearchInput value={busqueda} onChange={(v) => set({ q: v })} placeholder="Buscar por nombre o teléfono" className="min-w-60 flex-1" />
@@ -113,6 +118,7 @@ export default function Clientes() {
         )}
 
       <ClienteDetalle cliente={abierto} onClose={() => set({ cliente: null })} onEditar={(id) => set({ editar: String(id) }, false)} />
+      <PegarClientes open={pegar} onClose={(c) => set({ pegar: null, ...(c ? { cliente: String(c.id) } : {}) })} />
       <ClienteForm open={nuevo || !!editando} cliente={editando}
         onClose={(c) => set({ nuevo: null, editar: null, ...(c && !editando ? { cliente: String(c.id) } : {}) })} />
     </div>

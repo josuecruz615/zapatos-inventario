@@ -19,7 +19,7 @@ Aplicación de inventario, ventas y clientes. Usa la base nueva de Supabase (ver
 | `/ventas` | Ventas de hoy / mes / año / todo, agrupadas por día con totales; buscar por cliente o número; exportar CSV. Detalle con recibo (WhatsApp o copiar), editar y eliminar (devuelve existencias). |
 | `/ventas/:id/editar` | Edita productos, cantidades, cliente, fecha, total y nota; el inventario se ajusta solo con la diferencia. |
 | `/inventario/validar` | Validar inventario por marca, talla por talla: marcar lo encontrado (botón "Hay n" si coincide), terminar cada talla (lo no contado queda en 0), revisar diferencias y cerrar. El avance se guarda y se puede seguir desde otro teléfono. |
-| `/clientes` | Lista con búsqueda por nombre o teléfono, orden por mejores clientes o recientes, filtro "con problemas". Detalle con llamar/WhatsApp, historial y totales. |
+| `/clientes` | Lista con búsqueda por nombre o teléfono, orden por mejores clientes o recientes, filtro "con problemas". Detalle con llamar/WhatsApp, historial y totales. | **Pegar de WhatsApp**: pega uno o varios mensajes y se detectan nombre, teléfono y dirección (reglas propias, sin IA externa; `src/lib/parsearCliente.ts`); avisa si el teléfono o el nombre ya existen. El formulario de cliente (también al vender) tiene "Llenar con un mensaje copiado". |
 
 ## Uso local
 ```powershell
